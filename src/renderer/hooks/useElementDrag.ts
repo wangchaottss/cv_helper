@@ -1,8 +1,9 @@
 import { useCallback, useRef } from 'react';
 import { useEditorStore } from '../store/editorStore';
 import { clampToCanvas, getCanvasBounds } from '../utils/coordinates';
+import { detectAlignments, applySnap, getElementRect } from '../utils/alignment';
 
-const DRAG_THRESHOLD = 3; // px — minimum movement before drag starts
+const DRAG_THRESHOLD = 3; // px
 
 interface DragState {
   elementId: string;
@@ -19,23 +20,19 @@ export function useElementDrag() {
   const pendingDelta = useRef<{ dx: number; dy: number } | null>(null);
 
   const zoom = useEditorStore((s) => s.zoom);
-  const elements = useEditorStore((s) => s.elements);
   const selection = useEditorStore((s) => s.selection);
+
   const setSelection = useEditorStore((s) => s.setSelection);
+  const setGuideLines = useEditorStore((s) => s.setGuideLines);
+  const clearGuides = useEditorStore((s) => s.clearGuides);
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent, elementId: string) => {
       e.stopPropagation();
       e.preventDefault();
 
-      const element = elements[elementId];
+      const element = useEditorStore.getState().elements[elementId];
       if (!element) return;
-
-      const canvasRect = (e.currentTarget as HTMLElement)
-        .closest('[data-canvas-inner]')
-        ?.getBoundingClientRect();
-
-      if (!canvasRect) return;
 
       dragRef.current = {
         elementId,
@@ -46,13 +43,10 @@ export function useElementDrag() {
         isDragging: false,
       };
 
-      // Set pointer capture for reliable tracking
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-
-      // Select the element
       setSelection([elementId]);
     },
-    [elements, setSelection],
+    [setSelection],
   );
 
   const onPointerMove = useCallback(
@@ -69,16 +63,9 @@ export function useElementDrag() {
         dragRef.current.isDragging = true;
       }
 
-      // Convert screen delta to logical delta
       const logicalDx = Math.round(dx / zoom);
       const logicalDy = Math.round(dy / zoom);
 
-      const canvasBounds = getCanvasBounds();
-      const targetIds = selection.includes(dragRef.current.elementId)
-        ? selection
-        : [dragRef.current.elementId];
-
-      // Batch update all selected elements
       pendingDelta.current = { dx: logicalDx, dy: logicalDy };
 
       if (!rafRef.current) {
@@ -88,14 +75,61 @@ export function useElementDrag() {
           if (!delta) return;
           pendingDelta.current = null;
 
+          const store = useEditorStore.getState();
+          const currentSnapEnabled = store.snapEnabled;
+          const currentShowGuides = store.showGuides;
+          const canvasBounds = getCanvasBounds();
+
+          const targetIds = selection.includes(dragRef.current!.elementId)
+            ? selection
+            : [dragRef.current!.elementId];
+
+          // Compute new position for the primary element (for alignment detection)
+          const primaryId = dragRef.current!.elementId;
+          const primaryEl = store.elements[primaryId];
+          if (!primaryEl) return;
+
+          let newX = dragRef.current!.startElementX + delta.dx;
+          let newY = dragRef.current!.startElementY + delta.dy;
+
+          // Alignment detection and snap
+          if (currentShowGuides || currentSnapEnabled) {
+            const movingRect = getElementRect({
+              x: newX,
+              y: newY,
+              width: primaryEl.width,
+              height: primaryEl.height,
+            });
+
+            const otherRects = Object.values(store.elements)
+              .filter((el) => !targetIds.includes(el.id))
+              .map((el) => getElementRect(el));
+
+            const alignment = detectAlignments(movingRect, otherRects, canvasBounds);
+
+            if (currentShowGuides) {
+              setGuideLines({
+                horizontal: alignment.horizontal,
+                vertical: alignment.vertical,
+              });
+            }
+
+            if (currentSnapEnabled) {
+              const snapped = applySnap(newX, newY, alignment.snapX, alignment.snapY);
+              newX = snapped.x;
+              newY = snapped.y;
+            }
+          }
+
+          // Update all selected elements with the delta
           for (const id of targetIds) {
-            const el = useEditorStore.getState().elements[id];
+            const el = store.elements[id];
             if (!el) continue;
 
-            const newX = dragRef.current!.startElementX + delta.dx;
-            const newY = dragRef.current!.startElementY + delta.dy;
+            const elNewX = dragRef.current!.startElementX + delta.dx + (el.x - primaryEl.x);
+            const elNewY = dragRef.current!.startElementY + delta.dy + (el.y - primaryEl.y);
 
-            const clamped = clampToCanvas(newX, newY, el.width, el.height, canvasBounds);
+            const clamped = clampToCanvas(elNewX, elNewY, el.width, el.height, canvasBounds);
             useEditorStore.getState().updateElement(id, {
               x: clamped.x,
               y: clamped.y,
@@ -104,7 +138,7 @@ export function useElementDrag() {
         });
       }
     },
-    [zoom, selection],
+    [zoom, selection, setGuideLines],
   );
 
   const onPointerUp = useCallback(
@@ -114,11 +148,12 @@ export function useElementDrag() {
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
 
       if (dragRef.current.isDragging) {
-        // Push history on drag end
         useEditorStore.getState().pushHistory();
       }
 
-      // Reset
+      // Clear guide lines on drag end
+      clearGuides();
+
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
@@ -126,7 +161,7 @@ export function useElementDrag() {
       pendingDelta.current = null;
       dragRef.current = null;
     },
-    [],
+    [clearGuides],
   );
 
   return { onPointerDown, onPointerMove, onPointerUp };

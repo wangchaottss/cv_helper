@@ -4,6 +4,7 @@ import { getCanvasBounds } from '../../utils/coordinates';
 import { useDragDrop } from '../../hooks/useDragDrop';
 import { useElementDrag } from '../../hooks/useElementDrag';
 import CanvasElement from '../canvas/CanvasElement';
+import GuideLines from '../canvas/GuideLines';
 
 export default function Canvas() {
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -88,6 +89,9 @@ export default function Canvas() {
               onPointerDown={onPointerDown}
             />
           ))}
+
+          {/* Guide lines layer */}
+          <GuideLines />
 
           {/* Transparent overlay for pointer events during drag */}
           <div
