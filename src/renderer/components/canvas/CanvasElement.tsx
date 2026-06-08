@@ -1,5 +1,7 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
+import { useEditorStore } from '../../store/editorStore';
 import type { CanvasElement as CanvasElementType } from '../../types/elements';
+import FormatToolbar from './FormatToolbar';
 
 interface CanvasElementProps {
   element: CanvasElementType;
@@ -37,12 +39,45 @@ function ControlPoint({
 }
 
 export default function CanvasElement({ element, isSelected, onPointerDown }: CanvasElementProps) {
+  const updateElement = useEditorStore((s) => s.updateElement);
+  const [isEditing, setIsEditing] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const elementRef = useRef<HTMLDivElement>(null);
+
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       onPointerDown(e, element.id);
+
+      // Double click to enter edit mode on text elements
+      if (element.type === 'text' && e.detail === 2) {
+        setIsEditing(true);
+      }
     },
-    [element.id, onPointerDown],
+    [element.id, element.type, onPointerDown],
   );
+
+  // Sync contentHTML to store on input (debounced)
+  const handleInput = useCallback(() => {
+    if (!elementRef.current) return;
+    const html = elementRef.current.innerHTML;
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      updateElement(element.id, { contentHTML: html });
+    }, 300);
+  }, [element.id, updateElement]);
+
+  // Flush on blur immediately
+  const handleBlur = useCallback(() => {
+    setIsEditing(false);
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    if (elementRef.current) {
+      updateElement(element.id, { contentHTML: elementRef.current.innerHTML });
+    }
+  }, [element.id, updateElement]);
 
   const baseStyle: React.CSSProperties = {
     position: 'absolute',
@@ -79,9 +114,21 @@ export default function CanvasElement({ element, isSelected, onPointerDown }: Ca
     };
 
     return (
-      <div style={textStyle} onPointerDown={handlePointerDown} data-testid={`element-${element.id}`}>
-        {element.contentHTML}
-        {isSelected && renderControlPoints(element.width, element.height)}
+      <div style={{ position: 'relative' }}>
+        {/* Format toolbar — shown when editing */}
+        <FormatToolbar visible={isEditing} />
+        <div
+          ref={elementRef}
+          contentEditable={isEditing}
+          suppressContentEditableWarning
+          style={textStyle}
+          onPointerDown={handlePointerDown}
+          onInput={handleInput}
+          onBlur={handleBlur}
+          dangerouslySetInnerHTML={{ __html: element.contentHTML }}
+          data-testid={`element-${element.id}`}
+        />
+        {isSelected && !isEditing && renderControlPoints(element.width, element.height)}
       </div>
     );
   }

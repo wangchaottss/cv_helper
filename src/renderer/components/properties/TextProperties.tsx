@@ -1,5 +1,6 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import type { TextElement } from '../../types/elements';
+import { detectMixedFonts } from '../../utils/richText';
 import FontSelector from './FontSelector';
 
 interface TextPropertiesProps {
@@ -9,6 +10,10 @@ interface TextPropertiesProps {
 }
 
 export default function TextProperties({ element, onUpdate, disabled }: TextPropertiesProps) {
+  const hasMixedFonts = useMemo(
+    () => detectMixedFonts(element.contentHTML, element.defaultFontFamily),
+    [element.contentHTML, element.defaultFontFamily],
+  );
   const handleChange = useCallback(
     (field: keyof TextElement, value: string | number) => {
       onUpdate({ [field]: value });
@@ -20,10 +25,16 @@ export default function TextProperties({ element, onUpdate, disabled }: TextProp
     <div className="space-y-4" data-testid="text-properties">
       {/* Font Family */}
       <PropertyGroup label="Font">
+        {hasMixedFonts && (
+          <p className="text-[10px] text-amber-600 mb-1" data-testid="mixed-font-warning">
+            Mixed fonts detected
+          </p>
+        )}
         <FontSelector
-          value={element.defaultFontFamily}
+          value={hasMixedFonts ? '' : element.defaultFontFamily}
           onChange={(font) => handleChange('defaultFontFamily', font)}
           disabled={disabled}
+          placeholder={hasMixedFonts ? 'Mixed' : undefined}
         />
       </PropertyGroup>
 
