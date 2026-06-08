@@ -23,6 +23,8 @@ export function useElementDrag() {
   const selection = useEditorStore((s) => s.selection);
 
   const setSelection = useEditorStore((s) => s.setSelection);
+  const addToSelection = useEditorStore((s) => s.addToSelection);
+  const toggleSelection = useEditorStore((s) => s.toggleSelection);
   const setGuideLines = useEditorStore((s) => s.setGuideLines);
   const clearGuides = useEditorStore((s) => s.clearGuides);
 
@@ -34,17 +36,14 @@ export function useElementDrag() {
       const element = useEditorStore.getState().elements[elementId];
       if (!element) return;
 
-      dragRef.current = {
-        elementId,
-        startMouseX: e.clientX,
-        startMouseY: e.clientY,
-        startElementX: element.x,
-        startElementY: element.y,
-        isDragging: false,
-      };
+      const isMultiSelect = e.shiftKey || e.metaKey || e.ctrlKey;
 
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-      setSelection([elementId]);
+      // Handle selection based on modifier keys
+      if (isMultiSelect) {
+        toggleSelection(elementId);
+      } else {
+        setSelection([elementId]);
+      }
     },
     [setSelection],
   );

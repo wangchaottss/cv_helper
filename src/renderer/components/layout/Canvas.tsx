@@ -5,6 +5,7 @@ import { useDragDrop } from '../../hooks/useDragDrop';
 import { useElementDrag } from '../../hooks/useElementDrag';
 import CanvasElement from '../canvas/CanvasElement';
 import GuideLines from '../canvas/GuideLines';
+import MultiSelectOverlay from '../canvas/MultiSelectOverlay';
 
 export default function Canvas() {
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -89,6 +90,9 @@ export default function Canvas() {
               onPointerDown={onPointerDown}
             />
           ))}
+
+          {/* Multi-select bounding box */}
+          <MultiSelectOverlay />
 
           {/* Guide lines layer */}
           <GuideLines />
