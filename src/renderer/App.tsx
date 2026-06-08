@@ -5,6 +5,7 @@ import { useKeyboard } from './hooks/useKeyboard';
 import { useEditorStore } from './store/editorStore';
 import { serializeToHTML, deserializeFromHTML } from './utils/serialization';
 import { detectUsedFonts, generateFontEmbedCSS } from './utils/fontUsage';
+import { buildPrintHTML } from './utils/printHtml';
 import type { CanvasElement } from './types/elements';
 
 export default function App() {
@@ -80,6 +81,26 @@ export default function App() {
     }
   }, []);
 
+  // PDF export handler
+  const handleExportPDF = useCallback(async () => {
+    const state = useEditorStore.getState();
+    const elementList = Object.values(state.elements) as CanvasElement[];
+    if (elementList.length === 0) return;
+
+    const usedFonts = detectUsedFonts(elementList);
+    const fontDataUrls: Record<string, string> = {};
+    const fontCSS = generateFontEmbedCSS(usedFonts, fontDataUrls);
+
+    const printHTML = buildPrintHTML(elementList, fontCSS);
+
+    if (window.electronAPI) {
+      const result = await window.electronAPI.exportPDF(printHTML);
+      if (result.error) {
+        console.error('PDF export failed:', result.error);
+      }
+    }
+  }, []);
+
   // Listen for menu events from Electron main process
   useEffect(() => {
     if (!window.electronAPI?.onMenuCommand) return;
@@ -98,16 +119,19 @@ export default function App() {
         case 'menu-redo':
           useEditorStore.getState().redo();
           break;
-        case 'menu-delete':
-          // eslint-disable-next-line no-case-declarations
+        case 'menu-delete': {
           const sel = useEditorStore.getState().selection;
           if (sel.length > 0) useEditorStore.getState().removeElements(sel);
+          break;
+        }
+        case 'menu-export-pdf':
+          handleExportPDF();
           break;
       }
     });
 
     return cleanup;
-  }, [handleSave, handleOpen]);
+  }, [handleSave, handleOpen, handleExportPDF]);
 
   return <AppLayout />;
 }

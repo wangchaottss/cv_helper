@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, Menu, dialog } from 'electron';
 import { join } from 'path';
 import { readFile } from 'fs/promises';
+import { exportToPDF } from './pdfExport';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (process.platform === 'win32') {
@@ -229,10 +230,10 @@ ipcMain.handle('font:readBuiltInFont', async (_event, family: string, weight: nu
   }
 });
 
-// PDF export (placeholder — full implementation in P6)
-ipcMain.handle('pdf:export', async (_event, _elementsJson: string) => {
-  // Will be implemented in P6
-  return { success: false, error: 'PDF export will be implemented in P6' };
+// PDF export
+ipcMain.handle('pdf:export', async (_event, htmlString: string) => {
+  if (!mainWindow) return { success: false, error: 'No active window' };
+  return exportToPDF(htmlString, mainWindow);
 });
 
 // ============================================================
