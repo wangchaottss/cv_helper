@@ -24,6 +24,22 @@ const electronAPI = {
   // PDF Export
   exportPDF: (elementsJson: string): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke('pdf:export', elementsJson),
+
+  // Menu event listeners
+  onMenuCommand: (callback: (command: string) => void): (() => void) => {
+    const commands = ['menu-save', 'menu-open', 'menu-export-pdf', 'menu-undo', 'menu-redo', 'menu-delete', 'menu-new'];
+    const handlers = commands.map((cmd) => {
+      const handler = () => callback(cmd);
+      ipcRenderer.on(cmd, handler);
+      return { cmd, handler };
+    });
+    // Return cleanup function
+    return () => {
+      for (const { cmd, handler } of handlers) {
+        ipcRenderer.removeListener(cmd, handler);
+      }
+    };
+  },
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

@@ -8,6 +8,7 @@ export interface ElectronAPI {
   readHtml: (path: string) => Promise<string>;
   readBuiltInFont: (family: string, weight: number) => Promise<string | null>;
   exportPDF: (elementsJson: string) => Promise<{ success: boolean; error?: string }>;
+  onMenuCommand: (callback: (command: string) => void) => () => void;
 }
 
 declare global {
