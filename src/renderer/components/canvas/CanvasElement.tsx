@@ -57,18 +57,12 @@ export default function CanvasElement({ element, isSelected, onPointerDown }: Ca
     [element.type],
   );
 
-  // Focus element when entering edit mode
+  // Focus element when entering edit mode, keep cursor at click position
   useEffect(() => {
     if (isEditing && elementRef.current) {
       const timer = setTimeout(() => {
         elementRef.current?.focus();
-        // Place cursor at the end
-        const range = document.createRange();
-        range.selectNodeContents(elementRef.current!);
-        range.collapse(false);
-        const sel = window.getSelection();
-        sel?.removeAllRanges();
-        sel?.addRange(range);
+        // Don't move cursor — browser keeps it at the double-click position
       }, 0);
       return () => clearTimeout(timer);
     }
@@ -183,7 +177,10 @@ export default function CanvasElement({ element, isSelected, onPointerDown }: Ca
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
           onBlur={handleBlur}
-          dangerouslySetInnerHTML={{ __html: element.contentHTML }}
+          // Only set innerHTML from store when NOT editing —
+          // during editing the browser manages contentEditable content,
+          // and store-triggered re-renders would reset cursor position
+          {...(isEditing ? {} : { dangerouslySetInnerHTML: { __html: element.contentHTML } })}
         />
 
         {/* Control points — shown when selected but not editing */}
