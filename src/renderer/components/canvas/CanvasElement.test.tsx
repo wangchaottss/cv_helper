@@ -42,21 +42,21 @@ describe('CanvasElement', () => {
   describe('text element', () => {
     it('renders text content', () => {
       render(
-        <CanvasElement element={mockTextElement} isSelected={false} onPointerDown={noop} />,
+        <CanvasElement element={mockTextElement} isSelected={false} onPointerDown={noop} onResizeStart={noop} />,
       );
       expect(screen.getByText('Hello World')).toBeInTheDocument();
     });
 
     it('renders with correct data-testid', () => {
       render(
-        <CanvasElement element={mockTextElement} isSelected={false} onPointerDown={noop} />,
+        <CanvasElement element={mockTextElement} isSelected={false} onPointerDown={noop} onResizeStart={noop} />,
       );
       expect(screen.getByTestId('element-text-1')).toBeInTheDocument();
     });
 
     it('shows selection outline when selected', () => {
       render(
-        <CanvasElement element={mockTextElement} isSelected={true} onPointerDown={noop} />,
+        <CanvasElement element={mockTextElement} isSelected={true} onPointerDown={noop} onResizeStart={noop} />,
       );
       const el = screen.getByTestId('element-text-1');
       expect(el.style.outline).toContain('2px solid');
@@ -64,7 +64,7 @@ describe('CanvasElement', () => {
 
     it('does not show outline when not selected', () => {
       render(
-        <CanvasElement element={mockTextElement} isSelected={false} onPointerDown={noop} />,
+        <CanvasElement element={mockTextElement} isSelected={false} onPointerDown={noop} onResizeStart={noop} />,
       );
       const el = screen.getByTestId('element-text-1');
       expect(el.style.outline).toBe('');
@@ -74,7 +74,7 @@ describe('CanvasElement', () => {
   describe('image element', () => {
     it('renders placeholder when no src', () => {
       render(
-        <CanvasElement element={mockImageElement} isSelected={false} onPointerDown={noop} />,
+        <CanvasElement element={mockImageElement} isSelected={false} onPointerDown={noop} onResizeStart={noop} />,
       );
       expect(screen.getByText('Image Placeholder')).toBeInTheDocument();
     });
@@ -82,7 +82,7 @@ describe('CanvasElement', () => {
     it('renders image when src is provided', () => {
       const imgElement = { ...mockImageElement, src: 'data:image/png;base64,abc123' };
       render(
-        <CanvasElement element={imgElement} isSelected={false} onPointerDown={noop} />,
+        <CanvasElement element={imgElement} isSelected={false} onPointerDown={noop} onResizeStart={noop} />,
       );
       const img = screen.getByAltText('');
       expect(img).toBeInTheDocument();
@@ -90,7 +90,7 @@ describe('CanvasElement', () => {
 
     it('shows dashed border when no image loaded', () => {
       render(
-        <CanvasElement element={mockImageElement} isSelected={false} onPointerDown={noop} />,
+        <CanvasElement element={mockImageElement} isSelected={false} onPointerDown={noop} onResizeStart={noop} />,
       );
       const el = screen.getByTestId('element-img-1');
       expect(el.style.border).toContain('dashed');

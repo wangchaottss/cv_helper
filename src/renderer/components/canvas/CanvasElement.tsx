@@ -7,11 +7,17 @@ interface CanvasElementProps {
   element: CanvasElementType;
   isSelected: boolean;
   onPointerDown: (e: React.PointerEvent, elementId: string) => void;
+  onResizeStart: (e: React.PointerEvent, elementId: string, handleIndex: number) => void;
 }
 
 const CONTROL_POINT_SIZE = 8;
 
-function ControlPoint({ x, y, cursor }: { x: number; y: number; cursor: string }) {
+function ControlPoint({
+  x, y, cursor, onPointerDown,
+}: {
+  x: number; y: number; cursor: string;
+  onPointerDown: (e: React.PointerEvent) => void;
+}) {
   return (
     <div
       style={{
@@ -24,13 +30,13 @@ function ControlPoint({ x, y, cursor }: { x: number; y: number; cursor: string }
         border: '1.5px solid #2563eb',
         cursor,
         zIndex: 10,
-        pointerEvents: 'none',
       }}
+      onPointerDown={onPointerDown}
     />
   );
 }
 
-export default function CanvasElement({ element, isSelected, onPointerDown }: CanvasElementProps) {
+export default function CanvasElement({ element, isSelected, onPointerDown, onResizeStart }: CanvasElementProps) {
   const updateElement = useEditorStore((s) => s.updateElement);
   const [isEditing, setIsEditing] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -199,7 +205,7 @@ export default function CanvasElement({ element, isSelected, onPointerDown }: Ca
         />
 
         {/* Control points — shown when selected but not editing */}
-        {isSelected && !isEditing && renderControlPoints(element.width, element.height)}
+        {isSelected && !isEditing && renderControlPoints(element.width, element.height, element.id, onResizeStart)}
       </div>
     );
   }
@@ -229,12 +235,17 @@ export default function CanvasElement({ element, isSelected, onPointerDown }: Ca
       ) : (
         <span className="text-gray-400 text-sm">Image Placeholder</span>
       )}
-      {isSelected && renderControlPoints(element.width, element.height)}
+      {isSelected && renderControlPoints(element.width, element.height, element.id, onResizeStart)}
     </div>
   );
 }
 
-function renderControlPoints(width: number, height: number) {
+function renderControlPoints(
+  width: number,
+  height: number,
+  elementId: string,
+  onResizeStart: (e: React.PointerEvent, elementId: string, handleIndex: number) => void,
+) {
   const positions = [
     // Corners
     { x: 0, y: 0, cursor: 'nwse-resize' },
@@ -251,7 +262,13 @@ function renderControlPoints(width: number, height: number) {
   return (
     <>
       {positions.map((p, i) => (
-        <ControlPoint key={i} x={p.x} y={p.y} cursor={p.cursor} />
+        <ControlPoint
+          key={i}
+          x={p.x}
+          y={p.y}
+          cursor={p.cursor}
+          onPointerDown={(e) => onResizeStart(e, elementId, i)}
+        />
       ))}
     </>
   );

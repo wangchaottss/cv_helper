@@ -3,6 +3,7 @@ import { useEditorStore } from '../../store/editorStore';
 import { getCanvasBounds } from '../../utils/coordinates';
 import { useDragDrop } from '../../hooks/useDragDrop';
 import { useElementDrag } from '../../hooks/useElementDrag';
+import { useResize } from '../../hooks/useResize';
 import CanvasElement from '../canvas/CanvasElement';
 import GuideLines from '../canvas/GuideLines';
 import MultiSelectOverlay from '../canvas/MultiSelectOverlay';
@@ -20,6 +21,7 @@ export default function Canvas() {
 
   const { setCanvasRef, handleDragOver, handleDragLeave, handleDrop } = useDragDrop();
   const { onPointerDown } = useElementDrag();
+  const { onResizeStart } = useResize();
 
   const canvasBounds = getCanvasBounds();
   const pad = PADDING_LOGICAL * zoom;
@@ -105,6 +107,7 @@ export default function Canvas() {
                   element={el}
                   isSelected={selection.includes(el.id)}
                   onPointerDown={onPointerDown}
+                  onResizeStart={onResizeStart}
                 />
               ))}
               <MultiSelectOverlay />

@@ -4,6 +4,65 @@ import TextProperties from '../properties/TextProperties';
 import ImageProperties from '../properties/ImageProperties';
 import type { TextElement, ImageElement, CanvasElement } from '../../types/elements';
 
+// ============================================================
+// Z-order helpers
+// ============================================================
+
+function bringToFront(id: string) {
+  const store = useEditorStore.getState();
+  const elements = Object.values(store.elements);
+  const maxZ = elements.reduce((max, el) => Math.max(max, el.zIndex), 0);
+  store.updateElement(id, { zIndex: maxZ + 1 });
+}
+
+function sendToBack(id: string) {
+  const store = useEditorStore.getState();
+  const elements = Object.values(store.elements);
+  const minZ = elements.reduce((min, el) => Math.min(min, el.zIndex), Infinity);
+  store.updateElement(id, { zIndex: minZ - 1 });
+}
+
+function bringForward(id: string) {
+  const store = useEditorStore.getState();
+  const current = store.elements[id];
+  if (!current) return;
+  const elements = Object.values(store.elements);
+  const nextHigher = elements
+    .filter((el) => el.zIndex > current.zIndex)
+    .sort((a, b) => a.zIndex - b.zIndex)[0];
+  if (nextHigher) {
+    store.updateElement(id, { zIndex: nextHigher.zIndex });
+    store.updateElement(nextHigher.id, { zIndex: current.zIndex });
+  }
+}
+
+function sendBackward(id: string) {
+  const store = useEditorStore.getState();
+  const current = store.elements[id];
+  if (!current) return;
+  const elements = Object.values(store.elements);
+  const nextLower = elements
+    .filter((el) => el.zIndex < current.zIndex)
+    .sort((a, b) => b.zIndex - a.zIndex)[0];
+  if (nextLower) {
+    store.updateElement(id, { zIndex: nextLower.zIndex });
+    store.updateElement(nextLower.id, { zIndex: current.zIndex });
+  }
+}
+
+function LayerButton({ label, title, onClick }: { label: string; title: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onClick={onClick}
+      className="px-2 py-1 text-[10px] bg-white border border-gray-300 rounded hover:bg-gray-50 text-gray-600"
+    >
+      {label}
+    </button>
+  );
+}
+
 export default function PropertyPanel() {
   const selection = useEditorStore((s) => s.selection);
   const elements = useEditorStore((s) => s.elements);
@@ -57,6 +116,37 @@ export default function PropertyPanel() {
             onUpdate={handleUpdate}
             disabled={selection.length > 1}
           />
+        )}
+
+        {/* Z-order controls */}
+        {selectedElement && (
+          <div className="pt-3 border-t border-gray-100">
+            <label className="block text-[11px] font-medium text-gray-500 mb-2 uppercase tracking-wide">
+              Layer Order
+            </label>
+            <div className="grid grid-cols-2 gap-1">
+              <LayerButton
+                label="To Front"
+                title="Bring to front"
+                onClick={() => bringToFront(selection[0])}
+              />
+              <LayerButton
+                label="Forward"
+                title="Bring forward"
+                onClick={() => bringForward(selection[0])}
+              />
+              <LayerButton
+                label="Backward"
+                title="Send backward"
+                onClick={() => sendBackward(selection[0])}
+              />
+              <LayerButton
+                label="To Back"
+                title="Send to back"
+                onClick={() => sendToBack(selection[0])}
+              />
+            </div>
+          </div>
         )}
 
         {/* Multi-select position info */}
