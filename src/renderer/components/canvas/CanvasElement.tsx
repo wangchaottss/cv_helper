@@ -11,15 +11,7 @@ interface CanvasElementProps {
 
 const CONTROL_POINT_SIZE = 8;
 
-function ControlPoint({
-  x,
-  y,
-  cursor,
-}: {
-  x: number;
-  y: number;
-  cursor: string;
-}) {
+function ControlPoint({ x, y, cursor }: { x: number; y: number; cursor: string }) {
   return (
     <div
       style={{
@@ -44,26 +36,29 @@ export default function CanvasElement({ element, isSelected, onPointerDown }: Ca
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const elementRef = useRef<HTMLDivElement>(null);
 
+  // PointerDown: select + start drag
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
-      // Double click to enter edit mode on text elements
-      if (element.type === 'text' && e.detail >= 2) {
-        e.stopPropagation();
-        if (!isEditing) {
-          setIsEditing(true);
-        }
-        return; // Don't trigger drag on double-click
-      }
-
       onPointerDown(e, element.id);
     },
-    [element.id, element.type, isEditing, onPointerDown],
+    [element.id, onPointerDown],
+  );
+
+  // Double-click via mouse event (more reliable than pointer event detail)
+  const handleDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (element.type === 'text') {
+        setIsEditing(true);
+      }
+    },
+    [element.type],
   );
 
   // Focus element when entering edit mode
   useEffect(() => {
     if (isEditing && elementRef.current) {
-      // Small delay to let React commit the contentEditable attribute
       const timer = setTimeout(() => {
         elementRef.current?.focus();
         // Place cursor at the end
@@ -81,7 +76,6 @@ export default function CanvasElement({ element, isSelected, onPointerDown }: Ca
   // Exit edit mode if element is no longer selected
   useEffect(() => {
     if (!isSelected && isEditing) {
-      // Flush changes before exiting
       if (elementRef.current) {
         updateElement(element.id, { contentHTML: elementRef.current.innerHTML });
       }
@@ -120,18 +114,19 @@ export default function CanvasElement({ element, isSelected, onPointerDown }: Ca
     height: `${element.height}px`,
     zIndex: element.zIndex + (isSelected ? 1000 : 0),
     boxSizing: 'border-box',
-    cursor: 'move',
+    cursor: isEditing ? 'text' : 'move',
     touchAction: 'none',
   };
 
-  if (isSelected) {
+  if (isSelected && !isEditing) {
     baseStyle.outline = '2px solid #2563eb';
     baseStyle.outlineOffset = '0px';
   }
 
   if (element.type === 'text') {
-    const textStyle: React.CSSProperties = {
-      ...baseStyle,
+    const textInnerStyle: React.CSSProperties = {
+      width: '100%',
+      height: '100%',
       fontFamily: element.defaultFontFamily,
       fontSize: `${element.defaultFontSize}px`,
       color: element.defaultColor,
@@ -144,42 +139,55 @@ export default function CanvasElement({ element, isSelected, onPointerDown }: Ca
       overflow: 'hidden',
       wordBreak: 'break-word',
       whiteSpace: 'pre-wrap',
+      outline: 'none',
     };
 
     return (
-      <div style={{ position: 'relative' }}>
-        {/* Format toolbar — shown when editing */}
+      <div
+        style={{
+          ...baseStyle,
+          // Override cursor for the wrapper — inner div handles text cursor when editing
+          cursor: isEditing ? 'default' : 'move',
+        }}
+        data-testid={`element-${element.id}`}
+      >
+        {/* Format toolbar — outside contentEditable, positioned above */}
         <FormatToolbar visible={isEditing} />
+
+        {/* Editable text area */}
         <div
           ref={elementRef}
           contentEditable={isEditing}
           suppressContentEditableWarning
-          style={textStyle}
+          style={{
+            ...textInnerStyle,
+            cursor: isEditing ? 'text' : 'move',
+          }}
           onPointerDown={handlePointerDown}
+          onDoubleClick={handleDoubleClick}
           onInput={handleInput}
           onBlur={handleBlur}
           dangerouslySetInnerHTML={{ __html: element.contentHTML }}
-          data-testid={`element-${element.id}`}
         />
+
+        {/* Control points — shown when selected but not editing */}
         {isSelected && !isEditing && renderControlPoints(element.width, element.height)}
       </div>
     );
   }
 
   // Image element
-  const imageContainerStyle: React.CSSProperties = {
-    ...baseStyle,
-    border: element.src ? 'none' : '2px dashed #d1d5db',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: element.src ? 'transparent' : '#f9fafb',
-    overflow: 'hidden',
-  };
-
   return (
     <div
-      style={imageContainerStyle}
+      style={{
+        ...baseStyle,
+        border: element.src ? 'none' : '2px dashed #d1d5db',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: element.src ? 'transparent' : '#f9fafb',
+        overflow: 'hidden',
+      }}
       onPointerDown={handlePointerDown}
       data-testid={`element-${element.id}`}
     >
@@ -187,11 +195,7 @@ export default function CanvasElement({ element, isSelected, onPointerDown }: Ca
         <img
           src={element.src}
           alt=""
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: element.objectFit,
-          }}
+          style={{ width: '100%', height: '100%', objectFit: element.objectFit }}
           draggable={false}
         />
       ) : (
