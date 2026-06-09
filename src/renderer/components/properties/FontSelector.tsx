@@ -116,6 +116,7 @@ export default function FontSelector({ value, onChange, disabled, placeholder }:
       {isOpen && (
         <div
           className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 flex flex-col"
+          onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
           data-testid="font-selector-dropdown"
         >
