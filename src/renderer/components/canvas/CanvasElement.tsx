@@ -34,6 +34,7 @@ export default function CanvasElement({ element, isSelected, onPointerDown }: Ca
   const updateElement = useEditorStore((s) => s.updateElement);
   const [isEditing, setIsEditing] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const composingRef = useRef(false);
   const elementRef = useRef<HTMLDivElement>(null);
 
   // PointerDown: select + start drag
@@ -83,9 +84,22 @@ export default function CanvasElement({ element, isSelected, onPointerDown }: Ca
     }
   }, [isSelected, isEditing, element.id, updateElement]);
 
-  // Sync contentHTML to store on input (debounced)
+  // IME composition handling — skip syncing during composition
+  const handleCompositionStart = useCallback(() => {
+    composingRef.current = true;
+  }, []);
+
+  const handleCompositionEnd = useCallback(() => {
+    composingRef.current = false;
+    // Immediately sync after composition ends
+    if (elementRef.current) {
+      updateElement(element.id, { contentHTML: elementRef.current.innerHTML });
+    }
+  }, [element.id, updateElement]);
+
+  // Sync contentHTML to store on input (debounced, skips during IME composition)
   const handleInput = useCallback(() => {
-    if (!elementRef.current) return;
+    if (!elementRef.current || composingRef.current) return;
     const html = elementRef.current.innerHTML;
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -166,6 +180,8 @@ export default function CanvasElement({ element, isSelected, onPointerDown }: Ca
           onPointerDown={handlePointerDown}
           onDoubleClick={handleDoubleClick}
           onInput={handleInput}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
           onBlur={handleBlur}
           dangerouslySetInnerHTML={{ __html: element.contentHTML }}
         />
