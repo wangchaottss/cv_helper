@@ -7,7 +7,7 @@ import CanvasElement from '../canvas/CanvasElement';
 import GuideLines from '../canvas/GuideLines';
 import MultiSelectOverlay from '../canvas/MultiSelectOverlay';
 
-const PADDING = 8; // px around A4 canvas
+const PADDING_LOGICAL = 8; // logical px around A4 — scales with zoom
 
 export default function Canvas() {
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -22,8 +22,20 @@ export default function Canvas() {
   const { onPointerDown } = useElementDrag();
 
   const canvasBounds = getCanvasBounds();
-  const wrapperW = canvasBounds.width * zoom + PADDING * 2;
-  const wrapperH = canvasBounds.height * zoom + PADDING * 2;
+  // Padding scales with zoom — always PADDING_LOGICAL logical pixels
+  const pad = PADDING_LOGICAL * zoom;
+  const wrapperW = canvasBounds.width * zoom + pad * 2;
+  const wrapperH = canvasBounds.height * zoom + pad * 2;
+
+  // Initial zoom-to-fit when window first opens
+  useEffect(() => {
+    const el = canvasRef.current?.parentElement;
+    if (!el) return;
+    const fitW = (el.clientWidth - pad * 2) / canvasBounds.width;
+    const fitH = (el.clientHeight - pad * 2) / canvasBounds.height;
+    const fit = Math.min(fitW, fitH, 1); // never start > 100%
+    setZoom(Math.max(0.25, fit));
+  }, []); // only on mount
 
   // Center the canvas inside the viewport initially and after zoom
   const centerCanvas = useCallback(() => {
@@ -89,7 +101,7 @@ export default function Canvas() {
         style={{
           width: `${wrapperW}px`,
           height: `${wrapperH}px`,
-          padding: `${PADDING}px`,
+          padding: `${pad}px`,
         }}
       >
         <div
