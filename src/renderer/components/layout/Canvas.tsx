@@ -70,7 +70,7 @@ export default function Canvas() {
   return (
     <main
       ref={canvasRef}
-      className="flex-1 bg-canvas-bg overflow-auto p-8"
+      className="flex-1 bg-canvas-bg overflow-auto p-2"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -84,8 +84,8 @@ export default function Canvas() {
       */}
       <div
         style={{
-          minWidth: `${canvasBounds.width * zoom + 64}px`,
-          minHeight: `${canvasBounds.height * zoom + 64}px`,
+          minWidth: `${canvasBounds.width * zoom + 16}px`,
+          minHeight: `${canvasBounds.height * zoom + 16}px`,
           display: 'flex',
         }}
       >
