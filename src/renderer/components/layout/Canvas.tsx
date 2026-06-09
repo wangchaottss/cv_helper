@@ -30,13 +30,27 @@ export default function Canvas() {
     [setSelection],
   );
 
-  // Zoom with Ctrl/Cmd + mouse wheel
+  // Zoom with pinch / Ctrl+wheel — low sensitivity, keep canvas centered
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        const delta = e.deltaY > 0 ? -0.1 : 0.1;
-        setZoom(zoom + delta);
+        // Small step: 3% per tick (was 10%, way too sensitive for trackpad)
+        const delta = e.deltaY > 0 ? -0.03 : 0.03;
+        const newZoom = Math.max(0.25, Math.min(3, zoom + delta));
+        setZoom(newZoom);
+
+        // Keep A4 canvas roughly centered after zoom
+        const el = canvasRef.current;
+        if (el) {
+          const prevCenterX = el.scrollLeft + el.clientWidth / 2;
+          const prevCenterY = el.scrollTop + el.clientHeight / 2;
+          const ratio = newZoom / zoom;
+          requestAnimationFrame(() => {
+            el.scrollLeft = prevCenterX * ratio - el.clientWidth / 2;
+            el.scrollTop = prevCenterY * ratio - el.clientHeight / 2;
+          });
+        }
       }
     },
     [zoom, setZoom],
