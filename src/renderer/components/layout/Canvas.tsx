@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { getCanvasBounds } from '../../utils/coordinates';
 import { useDragDrop } from '../../hooks/useDragDrop';
@@ -6,6 +6,8 @@ import { useElementDrag } from '../../hooks/useElementDrag';
 import CanvasElement from '../canvas/CanvasElement';
 import GuideLines from '../canvas/GuideLines';
 import MultiSelectOverlay from '../canvas/MultiSelectOverlay';
+
+const PADDING = 8; // px around A4 canvas
 
 export default function Canvas() {
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -19,6 +21,22 @@ export default function Canvas() {
   const { setCanvasRef, handleDragOver, handleDragLeave, handleDrop } = useDragDrop();
   const { onPointerDown } = useElementDrag();
 
+  const canvasBounds = getCanvasBounds();
+  const wrapperW = canvasBounds.width * zoom + PADDING * 2;
+  const wrapperH = canvasBounds.height * zoom + PADDING * 2;
+
+  // Center the canvas inside the viewport initially and after zoom
+  const centerCanvas = useCallback(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    el.scrollLeft = Math.max(0, (wrapperW - el.clientWidth) / 2);
+    el.scrollTop = Math.max(0, (wrapperH - el.clientHeight) / 2);
+  }, [wrapperW, wrapperH]);
+
+  useEffect(() => {
+    centerCanvas();
+  }, [zoom, centerCanvas]); // re-center on zoom change
+
   // Handle click on canvas background to deselect
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent) => {
@@ -30,36 +48,20 @@ export default function Canvas() {
     [setSelection],
   );
 
-  // Zoom with pinch / Ctrl+wheel — low sensitivity, keep canvas centered
+  // Zoom with pinch / Ctrl+wheel — low sensitivity
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        // Small step: 3% per tick (was 10%, way too sensitive for trackpad)
         const delta = e.deltaY > 0 ? -0.03 : 0.03;
-        const newZoom = Math.max(0.25, Math.min(3, zoom + delta));
-        setZoom(newZoom);
-
-        // Keep A4 canvas roughly centered after zoom
-        const el = canvasRef.current;
-        if (el) {
-          const prevCenterX = el.scrollLeft + el.clientWidth / 2;
-          const prevCenterY = el.scrollTop + el.clientHeight / 2;
-          const ratio = newZoom / zoom;
-          requestAnimationFrame(() => {
-            el.scrollLeft = prevCenterX * ratio - el.clientWidth / 2;
-            el.scrollTop = prevCenterY * ratio - el.clientHeight / 2;
-          });
-        }
+        setZoom(Math.max(0.25, Math.min(3, zoom + delta)));
       }
     },
     [zoom, setZoom],
   );
 
   const elementList = Object.values(elements);
-  const canvasBounds = getCanvasBounds();
 
-  // Ref callback that wires dragDrop ref
   const innerRefCallback = useCallback(
     (el: HTMLDivElement | null) => {
       setCanvasRef(el);
@@ -70,7 +72,7 @@ export default function Canvas() {
   return (
     <main
       ref={canvasRef}
-      className="flex-1 bg-canvas-bg overflow-auto p-2"
+      className="flex-1 bg-canvas-bg overflow-auto"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -79,48 +81,47 @@ export default function Canvas() {
       data-testid="canvas-area"
     >
       {/*
-        margin: auto centers when content fits viewport;
-        when zoomed content overflows, margins shrink to 0 → natural scrolling.
+        Wrapper with exact visual dimensions: A4 * zoom + padding.
+        transformOrigin '0 0' means the scaled A4 starts at wrapper position.
+        When content > viewport → native scrolling in all directions.
       */}
       <div
         style={{
-          minWidth: `${canvasBounds.width * zoom + 16}px`,
-          minHeight: `${canvasBounds.height * zoom + 16}px`,
-          display: 'flex',
+          width: `${wrapperW}px`,
+          height: `${wrapperH}px`,
+          padding: `${PADDING}px`,
         }}
       >
-        <div style={{ margin: 'auto' }}>
+        <div
+          style={{
+            transform: `scale(${zoom})`,
+            transformOrigin: '0 0',
+          }}
+        >
           <div
+            ref={innerRefCallback}
+            data-canvas-inner="true"
+            className="bg-white shadow-xl relative"
             style={{
-              transform: `scale(${zoom})`,
-              transformOrigin: 'top left',
+              width: `${canvasBounds.width}px`,
+              height: `${canvasBounds.height}px`,
             }}
+            data-testid="a4-canvas"
           >
-            <div
-              ref={innerRefCallback}
-              data-canvas-inner="true"
-              className="bg-white shadow-xl relative"
-              style={{
-                width: `${canvasBounds.width}px`,
-                height: `${canvasBounds.height}px`,
-              }}
-              data-testid="a4-canvas"
-            >
-          {elementList.map((el) => (
-            <CanvasElement
-              key={el.id}
-              element={el}
-              isSelected={selection.includes(el.id)}
-              onPointerDown={onPointerDown}
-            />
-          ))}
+            {elementList.map((el) => (
+              <CanvasElement
+                key={el.id}
+                element={el}
+                isSelected={selection.includes(el.id)}
+                onPointerDown={onPointerDown}
+              />
+            ))}
 
-          {/* Multi-select bounding box */}
-          <MultiSelectOverlay />
+            {/* Multi-select bounding box */}
+            <MultiSelectOverlay />
 
-          {/* Guide lines layer */}
-          <GuideLines />
-            </div>
+            {/* Guide lines layer */}
+            <GuideLines />
           </div>
         </div>
       </div>
