@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import type { CanvasElement as CanvasElementType } from '../../types/elements';
 import FormatToolbar from './FormatToolbar';
@@ -45,24 +45,39 @@ export default function CanvasElement({ element, isSelected, onPointerDown }: Ca
     [element.id, onPointerDown],
   );
 
-  // Double-click via mouse event (more reliable than pointer event detail)
+  // Save content before React clears it when entering edit mode
+  const savedContentRef = useRef('');
+
+  // Double-click via mouse event
   const handleDoubleClick = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
       e.preventDefault();
       if (element.type === 'text') {
+        // Save current content before React removes dangerouslySetInnerHTML
+        savedContentRef.current = elementRef.current?.innerHTML || (element.type === 'text' ? element.contentHTML : '');
         setIsEditing(true);
       }
     },
-    [element.type],
+    [element.type, element.type === 'text' ? element.contentHTML : ''],
   );
 
-  // Focus element when entering edit mode, keep cursor at click position
+  // When entering edit mode, React clears the DOM (removes dangerouslySetInnerHTML).
+  // Restore content immediately after, before the browser paints.
+  useLayoutEffect(() => {
+    if (isEditing && elementRef.current) {
+      if (elementRef.current.innerHTML === '' || elementRef.current.innerHTML !== savedContentRef.current) {
+        elementRef.current.innerHTML = savedContentRef.current;
+      }
+      elementRef.current.focus();
+    }
+  }, [isEditing]);
+
+  // Focus element when entering edit mode
   useEffect(() => {
     if (isEditing && elementRef.current) {
       const timer = setTimeout(() => {
         elementRef.current?.focus();
-        // Don't move cursor — browser keeps it at the double-click position
       }, 0);
       return () => clearTimeout(timer);
     }
