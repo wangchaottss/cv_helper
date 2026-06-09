@@ -56,7 +56,7 @@ export default function Canvas() {
   return (
     <main
       ref={canvasRef}
-      className="flex-1 bg-canvas-bg flex items-center justify-center overflow-auto p-8"
+      className="flex-1 bg-canvas-bg overflow-auto p-8"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -64,31 +64,34 @@ export default function Canvas() {
       onWheel={handleWheel}
       data-testid="canvas-area"
     >
-      {/* Wrapper with explicit zoomed dimensions so overflow-auto on parent works */}
+      {/*
+        margin: auto centers when content fits viewport;
+        when zoomed content overflows, margins shrink to 0 → natural scrolling.
+      */}
       <div
-        className="flex items-center justify-center"
         style={{
           minWidth: `${canvasBounds.width * zoom + 64}px`,
           minHeight: `${canvasBounds.height * zoom + 64}px`,
+          display: 'flex',
         }}
       >
-        <div
-          style={{
-            transform: `scale(${zoom})`,
-            transformOrigin: 'center center',
-            transition: 'transform 0.1s ease-out',
-          }}
-        >
+        <div style={{ margin: 'auto' }}>
           <div
-            ref={innerRefCallback}
-            data-canvas-inner="true"
-            className="bg-white shadow-xl relative"
             style={{
-              width: `${canvasBounds.width}px`,
-              height: `${canvasBounds.height}px`,
+              transform: `scale(${zoom})`,
+              transformOrigin: 'top left',
             }}
-            data-testid="a4-canvas"
           >
+            <div
+              ref={innerRefCallback}
+              data-canvas-inner="true"
+              className="bg-white shadow-xl relative"
+              style={{
+                width: `${canvasBounds.width}px`,
+                height: `${canvasBounds.height}px`,
+              }}
+              data-testid="a4-canvas"
+            >
           {elementList.map((el) => (
             <CanvasElement
               key={el.id}
@@ -103,6 +106,7 @@ export default function Canvas() {
 
           {/* Guide lines layer */}
           <GuideLines />
+            </div>
           </div>
         </div>
       </div>
