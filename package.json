@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "A graphical resume/CV builder for macOS",
   "type": "module",
-  "main": "dist-electron/main/index.js",
+  "main": "dist-electron/main/index.cjs",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
