@@ -142,12 +142,16 @@ export function useElementDrag() {
   const onPointerDown = useCallback(
     (e: React.PointerEvent, elementId: string) => {
       e.stopPropagation();
-      // Don't prevent default — allow focus for contentEditable
-      // Only prevent default when not editing text
+
       const target = e.target as HTMLElement;
-      if (!target.isContentEditable) {
-        e.preventDefault();
+
+      // If clicking inside a contentEditable element, skip drag entirely —
+      // let the browser handle text selection
+      if (target.isContentEditable) {
+        return;
       }
+
+      e.preventDefault();
 
       const element = useEditorStore.getState().elements[elementId];
       if (!element) return;
