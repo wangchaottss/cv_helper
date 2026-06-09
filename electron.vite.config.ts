@@ -13,6 +13,9 @@ export default defineConfig({
         output: {
           format: 'cjs',
         },
+        external: [
+          'font-list',
+        ],
       },
     },
     resolve: {
