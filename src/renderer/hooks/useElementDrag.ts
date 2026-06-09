@@ -1,9 +1,9 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useEditorStore } from '../store/editorStore';
 import { clampToCanvas, getCanvasBounds } from '../utils/coordinates';
 import { detectAlignments, applySnap, getElementRect } from '../utils/alignment';
 
-const DRAG_THRESHOLD = 3; // px
+const DRAG_THRESHOLD = 3;
 
 interface DragState {
   elementId: string;
@@ -12,6 +12,7 @@ interface DragState {
   startElementX: number;
   startElementY: number;
   isDragging: boolean;
+  pointerId: number;
 }
 
 export function useElementDrag() {
@@ -19,149 +20,163 @@ export function useElementDrag() {
   const rafRef = useRef<number | null>(null);
   const pendingDelta = useRef<{ dx: number; dy: number } | null>(null);
 
-  const zoom = useEditorStore((s) => s.zoom);
-  const selection = useEditorStore((s) => s.selection);
+  const processFrame = useCallback(() => {
+    rafRef.current = null;
+    const drag = dragRef.current;
+    if (!drag || !drag.isDragging) return;
 
-  const setSelection = useEditorStore((s) => s.setSelection);
-  const addToSelection = useEditorStore((s) => s.addToSelection);
-  const toggleSelection = useEditorStore((s) => s.toggleSelection);
-  const setGuideLines = useEditorStore((s) => s.setGuideLines);
-  const clearGuides = useEditorStore((s) => s.clearGuides);
+    const delta = pendingDelta.current;
+    if (!delta) return;
+    pendingDelta.current = null;
+
+    const store = useEditorStore.getState();
+    const zoom = store.zoom;
+    const currentSnapEnabled = store.snapEnabled;
+    const currentShowGuides = store.showGuides;
+    const canvasBounds = getCanvasBounds();
+    const selection = store.selection;
+
+    const logicalDx = Math.round(delta.dx / zoom);
+    const logicalDy = Math.round(delta.dy / zoom);
+
+    const targetIds = selection.includes(drag.elementId)
+      ? selection
+      : [drag.elementId];
+
+    const primaryEl = store.elements[drag.elementId];
+    if (!primaryEl) return;
+
+    let newX = drag.startElementX + logicalDx;
+    let newY = drag.startElementY + logicalDy;
+
+    // Alignment detection and snap
+    if (currentShowGuides || currentSnapEnabled) {
+      const movingRect = getElementRect({
+        x: newX, y: newY,
+        width: primaryEl.width, height: primaryEl.height,
+      });
+
+      const otherRects = Object.values(store.elements)
+        .filter((el) => !targetIds.includes(el.id))
+        .map((el) => getElementRect(el));
+
+      const alignment = detectAlignments(movingRect, otherRects, canvasBounds);
+
+      if (currentShowGuides) {
+        useEditorStore.getState().setGuideLines({
+          horizontal: alignment.horizontal,
+          vertical: alignment.vertical,
+        });
+      }
+
+      if (currentSnapEnabled) {
+        const snapped = applySnap(newX, newY, alignment.snapX, alignment.snapY);
+        newX = snapped.x;
+        newY = snapped.y;
+      }
+    }
+
+    for (const id of targetIds) {
+      const el = store.elements[id];
+      if (!el) continue;
+      const elNewX = drag.startElementX + logicalDx + (el.x - primaryEl.x);
+      const elNewY = drag.startElementY + logicalDy + (el.y - primaryEl.y);
+      const clamped = clampToCanvas(elNewX, elNewY, el.width, el.height, canvasBounds);
+      useEditorStore.getState().updateElement(id, { x: clamped.x, y: clamped.y });
+    }
+  }, []);
+
+  // Use window-level pointer events during drag for reliable capture
+  const handleWindowPointerMove = useCallback((e: PointerEvent) => {
+    if (!dragRef.current) return;
+
+    const dx = e.clientX - dragRef.current.startMouseX;
+    const dy = e.clientY - dragRef.current.startMouseY;
+
+    if (!dragRef.current.isDragging) {
+      if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+      dragRef.current.isDragging = true;
+    }
+
+    pendingDelta.current = { dx, dy };
+
+    if (!rafRef.current) {
+      rafRef.current = requestAnimationFrame(processFrame);
+    }
+  }, [processFrame]);
+
+  const handleWindowPointerUp = useCallback((_e: PointerEvent) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+
+    if (drag.isDragging) {
+      useEditorStore.getState().pushHistory();
+      // Final frame flush
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      processFrame();
+    }
+
+    useEditorStore.getState().clearGuides();
+    pendingDelta.current = null;
+    dragRef.current = null;
+
+    // Remove window listeners
+    window.removeEventListener('pointermove', handleWindowPointerMove);
+    window.removeEventListener('pointerup', handleWindowPointerUp);
+  }, [processFrame, handleWindowPointerMove]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      window.removeEventListener('pointermove', handleWindowPointerMove);
+      window.removeEventListener('pointerup', handleWindowPointerUp);
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
+  }, [handleWindowPointerMove, handleWindowPointerUp]);
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent, elementId: string) => {
       e.stopPropagation();
-      e.preventDefault();
+      // Don't prevent default — allow focus for contentEditable
+      // Only prevent default when not editing text
+      const target = e.target as HTMLElement;
+      if (!target.isContentEditable) {
+        e.preventDefault();
+      }
 
       const element = useEditorStore.getState().elements[elementId];
       if (!element) return;
 
       const isMultiSelect = e.shiftKey || e.metaKey || e.ctrlKey;
 
-      // Handle selection based on modifier keys
       if (isMultiSelect) {
-        toggleSelection(elementId);
+        useEditorStore.getState().toggleSelection(elementId);
       } else {
-        setSelection([elementId]);
+        useEditorStore.getState().setSelection([elementId]);
       }
+
+      // Initialize drag state
+      dragRef.current = {
+        elementId,
+        startMouseX: e.clientX,
+        startMouseY: e.clientY,
+        startElementX: element.x,
+        startElementY: element.y,
+        isDragging: false,
+        pointerId: e.pointerId,
+      };
+
+      // Add window-level listeners for reliable move/up tracking
+      window.addEventListener('pointermove', handleWindowPointerMove);
+      window.addEventListener('pointerup', handleWindowPointerUp, { once: true });
     },
-    [setSelection],
+    [handleWindowPointerMove, handleWindowPointerUp],
   );
 
-  const onPointerMove = useCallback(
-    (e: React.PointerEvent) => {
-      if (!dragRef.current) return;
-
-      const dx = e.clientX - dragRef.current.startMouseX;
-      const dy = e.clientY - dragRef.current.startMouseY;
-
-      if (!dragRef.current.isDragging) {
-        if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) {
-          return;
-        }
-        dragRef.current.isDragging = true;
-      }
-
-      const logicalDx = Math.round(dx / zoom);
-      const logicalDy = Math.round(dy / zoom);
-
-      pendingDelta.current = { dx: logicalDx, dy: logicalDy };
-
-      if (!rafRef.current) {
-        rafRef.current = requestAnimationFrame(() => {
-          rafRef.current = null;
-          const delta = pendingDelta.current;
-          if (!delta) return;
-          pendingDelta.current = null;
-
-          const store = useEditorStore.getState();
-          const currentSnapEnabled = store.snapEnabled;
-          const currentShowGuides = store.showGuides;
-          const canvasBounds = getCanvasBounds();
-
-          const targetIds = selection.includes(dragRef.current!.elementId)
-            ? selection
-            : [dragRef.current!.elementId];
-
-          // Compute new position for the primary element (for alignment detection)
-          const primaryId = dragRef.current!.elementId;
-          const primaryEl = store.elements[primaryId];
-          if (!primaryEl) return;
-
-          let newX = dragRef.current!.startElementX + delta.dx;
-          let newY = dragRef.current!.startElementY + delta.dy;
-
-          // Alignment detection and snap
-          if (currentShowGuides || currentSnapEnabled) {
-            const movingRect = getElementRect({
-              x: newX,
-              y: newY,
-              width: primaryEl.width,
-              height: primaryEl.height,
-            });
-
-            const otherRects = Object.values(store.elements)
-              .filter((el) => !targetIds.includes(el.id))
-              .map((el) => getElementRect(el));
-
-            const alignment = detectAlignments(movingRect, otherRects, canvasBounds);
-
-            if (currentShowGuides) {
-              setGuideLines({
-                horizontal: alignment.horizontal,
-                vertical: alignment.vertical,
-              });
-            }
-
-            if (currentSnapEnabled) {
-              const snapped = applySnap(newX, newY, alignment.snapX, alignment.snapY);
-              newX = snapped.x;
-              newY = snapped.y;
-            }
-          }
-
-          // Update all selected elements with the delta
-          for (const id of targetIds) {
-            const el = store.elements[id];
-            if (!el) continue;
-
-            const elNewX = dragRef.current!.startElementX + delta.dx + (el.x - primaryEl.x);
-            const elNewY = dragRef.current!.startElementY + delta.dy + (el.y - primaryEl.y);
-
-            const clamped = clampToCanvas(elNewX, elNewY, el.width, el.height, canvasBounds);
-            useEditorStore.getState().updateElement(id, {
-              x: clamped.x,
-              y: clamped.y,
-            });
-          }
-        });
-      }
-    },
-    [zoom, selection, setGuideLines],
-  );
-
-  const onPointerUp = useCallback(
-    (e: React.PointerEvent) => {
-      if (!dragRef.current) return;
-
-      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-
-      if (dragRef.current.isDragging) {
-        useEditorStore.getState().pushHistory();
-      }
-
-      // Clear guide lines on drag end
-      clearGuides();
-
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-      pendingDelta.current = null;
-      dragRef.current = null;
-    },
-    [clearGuides],
-  );
-
-  return { onPointerDown, onPointerMove, onPointerUp };
+  return { onPointerDown };
 }

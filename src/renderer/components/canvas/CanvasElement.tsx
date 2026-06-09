@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import type { CanvasElement as CanvasElementType } from '../../types/elements';
 import FormatToolbar from './FormatToolbar';
@@ -46,15 +46,48 @@ export default function CanvasElement({ element, isSelected, onPointerDown }: Ca
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
-      onPointerDown(e, element.id);
-
       // Double click to enter edit mode on text elements
-      if (element.type === 'text' && e.detail === 2) {
-        setIsEditing(true);
+      if (element.type === 'text' && e.detail >= 2) {
+        e.stopPropagation();
+        if (!isEditing) {
+          setIsEditing(true);
+        }
+        return; // Don't trigger drag on double-click
       }
+
+      onPointerDown(e, element.id);
     },
-    [element.id, element.type, onPointerDown],
+    [element.id, element.type, isEditing, onPointerDown],
   );
+
+  // Focus element when entering edit mode
+  useEffect(() => {
+    if (isEditing && elementRef.current) {
+      // Small delay to let React commit the contentEditable attribute
+      const timer = setTimeout(() => {
+        elementRef.current?.focus();
+        // Place cursor at the end
+        const range = document.createRange();
+        range.selectNodeContents(elementRef.current!);
+        range.collapse(false);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [isEditing]);
+
+  // Exit edit mode if element is no longer selected
+  useEffect(() => {
+    if (!isSelected && isEditing) {
+      // Flush changes before exiting
+      if (elementRef.current) {
+        updateElement(element.id, { contentHTML: elementRef.current.innerHTML });
+      }
+      setIsEditing(false);
+    }
+  }, [isSelected, isEditing, element.id, updateElement]);
 
   // Sync contentHTML to store on input (debounced)
   const handleInput = useCallback(() => {

@@ -17,7 +17,7 @@ export default function Canvas() {
   const setZoom = useEditorStore((s) => s.setZoom);
 
   const { setCanvasRef, handleDragOver, handleDragLeave, handleDrop } = useDragDrop();
-  const { onPointerDown, onPointerMove, onPointerUp } = useElementDrag();
+  const { onPointerDown } = useElementDrag();
 
   // Handle click on canvas background to deselect
   const handleCanvasClick = useCallback(
@@ -45,7 +45,7 @@ export default function Canvas() {
   const elementList = Object.values(elements);
   const canvasBounds = getCanvasBounds();
 
-  // Ref callback that wires both our local ref and the dragDrop ref
+  // Ref callback that wires dragDrop ref
   const innerRefCallback = useCallback(
     (el: HTMLDivElement | null) => {
       setCanvasRef(el);
@@ -96,18 +96,6 @@ export default function Canvas() {
 
           {/* Guide lines layer */}
           <GuideLines />
-
-          {/* Transparent overlay for pointer events during drag */}
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              zIndex: 9999,
-              pointerEvents: 'none',
-            }}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-          />
         </div>
       </div>
     </main>
