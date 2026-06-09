@@ -64,24 +64,31 @@ export default function Canvas() {
       onWheel={handleWheel}
       data-testid="canvas-area"
     >
+      {/* Wrapper with explicit zoomed dimensions so overflow-auto on parent works */}
       <div
         className="flex items-center justify-center"
         style={{
-          transform: `scale(${zoom})`,
-          transformOrigin: 'center center',
-          transition: 'transform 0.1s ease-out',
+          minWidth: `${canvasBounds.width * zoom + 64}px`,
+          minHeight: `${canvasBounds.height * zoom + 64}px`,
         }}
       >
         <div
-          ref={innerRefCallback}
-          data-canvas-inner="true"
-          className="bg-white shadow-xl relative"
           style={{
-            width: `${canvasBounds.width}px`,
-            height: `${canvasBounds.height}px`,
+            transform: `scale(${zoom})`,
+            transformOrigin: 'center center',
+            transition: 'transform 0.1s ease-out',
           }}
-          data-testid="a4-canvas"
         >
+          <div
+            ref={innerRefCallback}
+            data-canvas-inner="true"
+            className="bg-white shadow-xl relative"
+            style={{
+              width: `${canvasBounds.width}px`,
+              height: `${canvasBounds.height}px`,
+            }}
+            data-testid="a4-canvas"
+          >
           {elementList.map((el) => (
             <CanvasElement
               key={el.id}
@@ -96,6 +103,7 @@ export default function Canvas() {
 
           {/* Guide lines layer */}
           <GuideLines />
+          </div>
         </div>
       </div>
     </main>
