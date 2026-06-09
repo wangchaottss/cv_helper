@@ -7,7 +7,7 @@ import CanvasElement from '../canvas/CanvasElement';
 import GuideLines from '../canvas/GuideLines';
 import MultiSelectOverlay from '../canvas/MultiSelectOverlay';
 
-const PADDING_LOGICAL = 8; // logical px around A4 — scales with zoom
+const PADDING_LOGICAL = 8; // logical px — scales with zoom
 
 export default function Canvas() {
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -22,34 +22,22 @@ export default function Canvas() {
   const { onPointerDown } = useElementDrag();
 
   const canvasBounds = getCanvasBounds();
-  // Padding scales with zoom — always PADDING_LOGICAL logical pixels
   const pad = PADDING_LOGICAL * zoom;
   const wrapperW = canvasBounds.width * zoom + pad * 2;
   const wrapperH = canvasBounds.height * zoom + pad * 2;
 
-  // Initial zoom-to-fit when window first opens
+  // Initial zoom-to-fit on mount
   useEffect(() => {
-    const el = canvasRef.current?.parentElement;
+    const el = canvasRef.current;
     if (!el) return;
     const fitW = (el.clientWidth - pad * 2) / canvasBounds.width;
     const fitH = (el.clientHeight - pad * 2) / canvasBounds.height;
-    const fit = Math.min(fitW, fitH, 1); // never start > 100%
+    const fit = Math.min(fitW, fitH, 1);
     setZoom(Math.max(0.25, fit));
-  }, []); // only on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Center the canvas inside the viewport initially and after zoom
-  const centerCanvas = useCallback(() => {
-    const el = canvasRef.current;
-    if (!el) return;
-    el.scrollLeft = Math.max(0, (wrapperW - el.clientWidth) / 2);
-    el.scrollTop = Math.max(0, (wrapperH - el.clientHeight) / 2);
-  }, [wrapperW, wrapperH]);
-
-  useEffect(() => {
-    centerCanvas();
-  }, [zoom, centerCanvas]); // re-center on zoom change
-
-  // Handle click on canvas background to deselect
+  // Click on canvas background to deselect
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent) => {
       const target = e.target as HTMLElement;
@@ -60,7 +48,7 @@ export default function Canvas() {
     [setSelection],
   );
 
-  // Zoom with pinch / Ctrl+wheel — low sensitivity
+  // Zoom with pinch / Ctrl+wheel
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
       if (e.ctrlKey || e.metaKey) {
@@ -75,9 +63,7 @@ export default function Canvas() {
   const elementList = Object.values(elements);
 
   const innerRefCallback = useCallback(
-    (el: HTMLDivElement | null) => {
-      setCanvasRef(el);
-    },
+    (el: HTMLDivElement | null) => setCanvasRef(el),
     [setCanvasRef],
   );
 
@@ -92,48 +78,38 @@ export default function Canvas() {
       onWheel={handleWheel}
       data-testid="canvas-area"
     >
-      {/*
-        Wrapper with exact visual dimensions: A4 * zoom + padding.
-        transformOrigin '0 0' means the scaled A4 starts at wrapper position.
-        When content > viewport → native scrolling in all directions.
-      */}
-      <div
-        style={{
-          width: `${wrapperW}px`,
-          height: `${wrapperH}px`,
-          padding: `${pad}px`,
-        }}
-      >
+      {/* Flex wrapper: margin:auto centers A4 when it fits; margins → 0 when overflow */}
+      <div style={{ display: 'flex', minHeight: '100%', minWidth: 'fit-content' }}>
         <div
           style={{
-            transform: `scale(${zoom})`,
-            transformOrigin: '0 0',
+            margin: 'auto',
+            width: `${wrapperW}px`,
+            height: `${wrapperH}px`,
+            padding: `${pad}px`,
           }}
         >
-          <div
-            ref={innerRefCallback}
-            data-canvas-inner="true"
-            className="bg-white shadow-xl relative"
-            style={{
-              width: `${canvasBounds.width}px`,
-              height: `${canvasBounds.height}px`,
-            }}
-            data-testid="a4-canvas"
-          >
-            {elementList.map((el) => (
-              <CanvasElement
-                key={el.id}
-                element={el}
-                isSelected={selection.includes(el.id)}
-                onPointerDown={onPointerDown}
-              />
-            ))}
-
-            {/* Multi-select bounding box */}
-            <MultiSelectOverlay />
-
-            {/* Guide lines layer */}
-            <GuideLines />
+          <div style={{ transform: `scale(${zoom})`, transformOrigin: '0 0' }}>
+            <div
+              ref={innerRefCallback}
+              data-canvas-inner="true"
+              className="bg-white shadow-xl relative"
+              style={{
+                width: `${canvasBounds.width}px`,
+                height: `${canvasBounds.height}px`,
+              }}
+              data-testid="a4-canvas"
+            >
+              {elementList.map((el) => (
+                <CanvasElement
+                  key={el.id}
+                  element={el}
+                  isSelected={selection.includes(el.id)}
+                  onPointerDown={onPointerDown}
+                />
+              ))}
+              <MultiSelectOverlay />
+              <GuideLines />
+            </div>
           </div>
         </div>
       </div>
