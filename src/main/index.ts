@@ -34,7 +34,8 @@ function createWindow() {
     mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
   } else {
     // In production, load the built HTML file
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
+    const rendererPath = join(__dirname, '../../dist/renderer/index.html');
+    mainWindow.loadFile(rendererPath);
   }
 
   // Build application menu

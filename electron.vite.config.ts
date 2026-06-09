@@ -41,6 +41,7 @@ export default defineConfig({
   },
   renderer: {
     root: '.',
+    base: './',
     build: {
       outDir: 'dist/renderer',
       rollupOptions: {
@@ -55,6 +56,15 @@ export default defineConfig({
         '@renderer': resolve(__dirname, 'src/renderer'),
       },
     },
-    plugins: [react()],
+    plugins: [
+      react(),
+      // Remove crossorigin attribute for Electron file:// compatibility
+      {
+        name: 'remove-crossorigin',
+        transformIndexHtml(html) {
+          return html.replace(/\s+crossorigin\b/g, '');
+        },
+      },
+    ],
   },
 });
