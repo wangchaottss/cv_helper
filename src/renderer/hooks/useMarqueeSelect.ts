@@ -82,10 +82,16 @@ export function useMarqueeSelect() {
       const selected: string[] = [];
 
       for (const el of elements) {
-        if (el.type === 'guideline' || el.type === 'line') continue; // guidelines don't have x/y/width/height
+        if (el.type === 'guideline') continue;
+        if (el.type === 'line') {
+          if (el.x1 >= m.x && el.x1 <= m.x + m.width && el.y1 >= m.y && el.y1 <= m.y + m.height &&
+              el.x2 >= m.x && el.x2 <= m.x + m.width && el.y2 >= m.y && el.y2 <= m.y + m.height) {
+            selected.push(el.id);
+          }
+          continue;
+        }
         if (
-          el.x >= m.x &&
-          el.y >= m.y &&
+          el.x >= m.x && el.y >= m.y &&
           el.x + el.width <= m.x + m.width &&
           el.y + el.height <= m.y + m.height
         ) {

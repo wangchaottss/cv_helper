@@ -42,6 +42,16 @@ export default function BoxRenderer({ element, isSelected, onPointerDown, onResi
       }}
       onPointerDown={(e) => onPointerDown(e, element.id)}
     >
+      {/* Name label — only when selected */}
+      {isSelected && (
+        <span style={{
+          position: 'absolute', top: -16, left: 2,
+          fontSize: 11, fontWeight: 600, color: borderWidth > 0 ? borderColor : '#888',
+          backgroundColor: 'rgba(255,255,255,0.9)', padding: '0 3px', borderRadius: 3,
+          pointerEvents: 'none', userSelect: 'none',
+        }}>{element.name}</span>
+      )}
+
       {/* Control points */}
       {isSelected && renderControlPoints(element.width, element.height, element.id, onResizeStart)}
     </div>
