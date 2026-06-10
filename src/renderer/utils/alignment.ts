@@ -14,7 +14,7 @@ export interface ElementRect {
   centerY: number;
 }
 
-const SNAP_THRESHOLD = 5; // px
+const SNAP_THRESHOLD = 8; // logical px — wider snap zone for easier alignment
 
 export function getElementRect(element: { x: number; y: number; width: number; height: number }): ElementRect {
   return {
