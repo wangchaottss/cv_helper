@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useEditorStore } from '../store/editorStore';
 import { clampToCanvas, getCanvasBounds } from '../utils/coordinates';
-import { detectAlignments, getElementRect } from '../utils/alignment';
+import { getElementRect } from '../utils/alignment';
 
 const MIN_SIZE = 20; // minimum width/height in px
 
@@ -93,73 +93,130 @@ export function useResize() {
       newH = MIN_SIZE;
     }
 
-    // Alignment detection and snap during resize
+    // Edge-specific snapping during resize — only snap the edge(s) being dragged
     const canvasBounds = getCanvasBounds();
     if (store.snapEnabled) {
-      const movingRect = getElementRect({ x: newX, y: newY, width: newW, height: newH });
-      const otherRects = Object.values(store.elements)
-        .filter((el) => el.id !== rs.elementId)
-        .map((el) => {
-          if (el.type === 'guideline') {
-            return el.orientation === 'horizontal'
-              ? { left: 0, right: canvasBounds.width, top: el.position, bottom: el.position, centerX: canvasBounds.width / 2, centerY: el.position }
-              : { left: el.position, right: el.position, top: 0, bottom: canvasBounds.height, centerX: el.position, centerY: canvasBounds.height / 2 };
+      const allOtherEls = Object.values(store.elements).filter((el) => el.id !== rs.elementId);
+      interface RefEdge { edge: 'left' | 'right' | 'centerX' | 'top' | 'bottom' | 'centerY'; pos: number; elId: string }
+      const refEdges: RefEdge[] = allOtherEls.flatMap((el) => {
+        let r: { left: number; right: number; top: number; bottom: number; centerX: number; centerY: number };
+        if (el.type === 'guideline') {
+          r = el.orientation === 'horizontal'
+            ? { left: 0, right: canvasBounds.width, top: el.position, bottom: el.position, centerX: canvasBounds.width / 2, centerY: el.position }
+            : { left: el.position, right: el.position, top: 0, bottom: canvasBounds.height, centerX: el.position, centerY: canvasBounds.height / 2 };
+        } else {
+          r = getElementRect(el);
+        }
+        return [
+          { edge: 'left' as const, pos: r.left, elId: el.id },
+          { edge: 'right' as const, pos: r.right, elId: el.id },
+          { edge: 'centerX' as const, pos: r.centerX, elId: el.id },
+          { edge: 'top' as const, pos: r.top, elId: el.id },
+          { edge: 'bottom' as const, pos: r.bottom, elId: el.id },
+          { edge: 'centerY' as const, pos: r.centerY, elId: el.id },
+        ];
+      });
+      // Canvas borders
+      refEdges.push(
+        { edge: 'left', pos: 0, elId: '__canvas__' },
+        { edge: 'right', pos: canvasBounds.width, elId: '__canvas__' },
+        { edge: 'top', pos: 0, elId: '__canvas__' },
+        { edge: 'bottom', pos: canvasBounds.height, elId: '__canvas__' },
+        { edge: 'centerX', pos: canvasBounds.width / 2, elId: '__canvas__' },
+        { edge: 'centerY', pos: canvasBounds.height / 2, elId: '__canvas__' },
+      );
+
+      const SNAP_THRESHOLD = 8;
+      const targets: string[] = [];
+      let appliedSnapX = false;
+      let appliedSnapY = false;
+
+      // Snap left edge (when resizing w, nw, sw)
+      if (rs.handle.includes('w')) {
+        const movingLeft = newX;
+        let best: { offset: number; elId: string } | null = null;
+        for (const r of refEdges) {
+          if (r.edge === 'left' || r.edge === 'right' || r.edge === 'centerX') {
+            const offset = r.pos - movingLeft;
+            const dist = Math.abs(offset);
+            if (dist < SNAP_THRESHOLD && (!best || dist < Math.abs(best.offset))) {
+              best = { offset, elId: r.elId };
+            }
           }
-          return getElementRect(el);
-        });
+        }
+        if (best) {
+          newX += best.offset;
+          newW -= best.offset;
+          targets.push(best.elId);
+          appliedSnapX = true;
+        }
+      }
 
-      const alignment = detectAlignments(movingRect, otherRects, canvasBounds);
-
-      // Find snap targets for visual highlight
-      if (alignment.snapX !== null || alignment.snapY !== null) {
-        const sx = alignment.snapX ?? 0;
-        const sy = alignment.snapY ?? 0;
-        const targets: string[] = [];
-        // Find which elements contributed to the snap
-        const allOtherEls = Object.values(store.elements).filter((el) => el.id !== rs.elementId);
-        for (const otherEl of allOtherEls) {
-          let r: { left: number; right: number; top: number; bottom: number; centerX: number; centerY: number };
-          if (otherEl.type === 'guideline') {
-            r = otherEl.orientation === 'horizontal'
-              ? { left: 0, right: canvasBounds.width, top: otherEl.position, bottom: otherEl.position, centerX: canvasBounds.width / 2, centerY: otherEl.position }
-              : { left: otherEl.position, right: otherEl.position, top: 0, bottom: canvasBounds.height, centerX: otherEl.position, centerY: canvasBounds.height / 2 };
-          } else {
-            r = getElementRect(otherEl);
-          }
-          const snappedRect = getElementRect({ x: newX + sx, y: newY + sy, width: newW, height: newH });
-          if (
-            Math.abs(snappedRect.left - r.left) < 1 || Math.abs(snappedRect.right - r.right) < 1 ||
-            Math.abs(snappedRect.left - r.right) < 1 || Math.abs(snappedRect.right - r.left) < 1 ||
-            Math.abs(snappedRect.top - r.top) < 1 || Math.abs(snappedRect.bottom - r.bottom) < 1 ||
-            Math.abs(snappedRect.top - r.bottom) < 1 || Math.abs(snappedRect.bottom - r.top) < 1 ||
-            Math.abs(snappedRect.centerX - r.centerX) < 1 || Math.abs(snappedRect.centerY - r.centerY) < 1
-          ) {
-            targets.push(otherEl.id);
+      // Snap right edge (when resizing e, ne, se)
+      if (rs.handle.includes('e') && !appliedSnapX) {
+        const movingRight = newX + newW;
+        let best: { offset: number; elId: string } | null = null;
+        for (const r of refEdges) {
+          if (r.edge === 'left' || r.edge === 'right' || r.edge === 'centerX') {
+            const offset = r.pos - movingRight;
+            const dist = Math.abs(offset);
+            if (dist < SNAP_THRESHOLD && (!best || dist < Math.abs(best.offset))) {
+              best = { offset, elId: r.elId };
+            }
           }
         }
-        // Canvas borders
-        if (Math.abs(newX + sx) < 1 || Math.abs(newY + sy) < 1 ||
-            Math.abs(newX + sx + newW - canvasBounds.width) < 1 ||
-            Math.abs(newY + sy + newH - canvasBounds.height) < 1 ||
-            Math.abs(newX + sx + newW / 2 - canvasBounds.width / 2) < 1 ||
-            Math.abs(newY + sy + newH / 2 - canvasBounds.height / 2) < 1) {
-          targets.push('__canvas__');
+        if (best) {
+          newW += best.offset;
+          targets.push(best.elId);
         }
-        store.setSnapTargets(targets);
+      }
 
-        // Apply snap correction based on which edge is being resized
-        if (alignment.snapX !== null) {
-          if (rs.handle.includes('w')) { newX += alignment.snapX; newW -= alignment.snapX; }
-          else if (rs.handle.includes('e')) { newW += alignment.snapX; }
+      // Snap top edge (when resizing n, nw, ne)
+      if (rs.handle.includes('n')) {
+        const movingTop = newY;
+        let best: { offset: number; elId: string } | null = null;
+        for (const r of refEdges) {
+          if (r.edge === 'top' || r.edge === 'bottom' || r.edge === 'centerY') {
+            const offset = r.pos - movingTop;
+            const dist = Math.abs(offset);
+            if (dist < SNAP_THRESHOLD && (!best || dist < Math.abs(best.offset))) {
+              best = { offset, elId: r.elId };
+            }
+          }
         }
-        if (alignment.snapY !== null) {
-          if (rs.handle.includes('n')) { newY += alignment.snapY; newH -= alignment.snapY; }
-          else if (rs.handle.includes('s')) { newH += alignment.snapY; }
+        if (best) {
+          newY += best.offset;
+          newH -= best.offset;
+          targets.push(best.elId);
+          appliedSnapY = true;
         }
+      }
 
-        // Re-check min size after snap
-        if (newW < MIN_SIZE) { newW = MIN_SIZE; if (rs.handle.includes('w')) newX = rs.startX + rs.startW - MIN_SIZE; }
-        if (newH < MIN_SIZE) { newH = MIN_SIZE; if (rs.handle.includes('n')) newY = rs.startY + rs.startH - MIN_SIZE; }
+      // Snap bottom edge (when resizing s, sw, se)
+      if (rs.handle.includes('s') && !appliedSnapY) {
+        const movingBottom = newY + newH;
+        let best: { offset: number; elId: string } | null = null;
+        for (const r of refEdges) {
+          if (r.edge === 'top' || r.edge === 'bottom' || r.edge === 'centerY') {
+            const offset = r.pos - movingBottom;
+            const dist = Math.abs(offset);
+            if (dist < SNAP_THRESHOLD && (!best || dist < Math.abs(best.offset))) {
+              best = { offset, elId: r.elId };
+            }
+          }
+        }
+        if (best) {
+          newH += best.offset;
+          targets.push(best.elId);
+        }
+      }
+
+      // Re-check min size after snap
+      if (newW < MIN_SIZE) { newW = MIN_SIZE; if (rs.handle.includes('w')) newX = rs.startX + rs.startW - MIN_SIZE; }
+      if (newH < MIN_SIZE) { newH = MIN_SIZE; if (rs.handle.includes('n')) newY = rs.startY + rs.startH - MIN_SIZE; }
+
+      if (targets.length > 0) {
+        store.setSnapTargets([...new Set(targets)]);
       } else {
         store.setSnapTargets([]);
       }
