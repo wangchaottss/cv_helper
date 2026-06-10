@@ -15,7 +15,7 @@ export default function MultiSelectOverlay() {
 
     for (const id of selection) {
       const el = elements[id];
-      if (!el) continue;
+      if (!el || el.type === 'guideline') continue;
       minX = Math.min(minX, el.x);
       minY = Math.min(minY, el.y);
       maxX = Math.max(maxX, el.x + el.width);

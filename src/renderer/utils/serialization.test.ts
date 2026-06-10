@@ -76,7 +76,7 @@ describe('deserializeFromHTML', () => {
     const elements = [makeTextEl({ id: 'pos-test', x: 300, y: 400 })];
     const html = serializeToHTML(elements, { version: '0.1.0', timestamp: 1, zoom: 1 });
     const result = deserializeFromHTML(html);
-    expect(result!.elements[0].x).toBe(300);
-    expect(result!.elements[0].y).toBe(400);
+    const r0 = result!.elements[0]; if (r0.type !== 'guideline') expect(r0.x).toBe(300);
+    if (r0.type !== 'guideline') expect(r0.y).toBe(400);
   });
 });

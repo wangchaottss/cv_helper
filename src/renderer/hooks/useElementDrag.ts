@@ -44,7 +44,7 @@ export function useElementDrag() {
       : [drag.elementId];
 
     const primaryEl = store.elements[drag.elementId];
-    if (!primaryEl) return;
+    if (!primaryEl || primaryEl.type === 'guideline') return;
 
     let newX = drag.startElementX + logicalDx;
     let newY = drag.startElementY + logicalDy;
@@ -59,7 +59,7 @@ export function useElementDrag() {
       const otherElements = Object.values(store.elements).filter(
         (el) => !targetIds.includes(el.id),
       );
-      const otherRects = otherElements.map((el) => getElementRect(el));
+      const otherRects = otherElements.map((el) => (el.type === 'guideline' ? (el.orientation === 'horizontal' ? { left: 0, right: canvasBounds.width, top: el.position, bottom: el.position, centerX: canvasBounds.width / 2, centerY: el.position } : { left: el.position, right: el.position, top: 0, bottom: canvasBounds.height, centerX: el.position, centerY: canvasBounds.height / 2 }) : getElementRect(el)));
 
       const alignment = detectAlignments(movingRect, otherRects, canvasBounds);
 
@@ -119,7 +119,7 @@ export function useElementDrag() {
 
     for (const id of targetIds) {
       const el = store.elements[id];
-      if (!el) continue;
+      if (!el || el.type === 'guideline') continue;
       const elNewX = drag.startElementX + effectiveDx + (el.x - primaryEl.x);
       const elNewY = drag.startElementY + effectiveDy + (el.y - primaryEl.y);
       const clamped = clampToCanvas(elNewX, elNewY, el.width, el.height, canvasBounds);
@@ -197,7 +197,7 @@ export function useElementDrag() {
 
       const store = useEditorStore.getState();
       const element = store.elements[elementId];
-      if (!element) return;
+      if (!element || element.type === 'guideline') return;
 
       const isMultiSelect = e.shiftKey || e.metaKey || e.ctrlKey;
       const alreadySelected = store.selection.includes(elementId);

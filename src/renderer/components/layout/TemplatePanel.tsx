@@ -1,4 +1,26 @@
 import React, { useCallback } from 'react';
+import { useEditorStore } from '../../store/editorStore';
+import { getCanvasBounds } from '../../utils/coordinates';
+import type { GuideLineElement } from '../../types/elements';
+
+let _guideCounter = 0;
+function nextGuideName(): string {
+  _guideCounter += 1;
+  return `A${_guideCounter}`;
+}
+
+function createGuideLine(pageIndex: number): GuideLineElement {
+  const bounds = getCanvasBounds();
+  return {
+    id: `gl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    type: 'guideline',
+    orientation: 'horizontal',
+    position: bounds.height / 2, // center of A4 page
+    color: '#3b82f6', // blue
+    name: nextGuideName(),
+    pageIndex,
+  };
+}
 
 const TEMPLATE_ITEMS = [
   {
@@ -18,6 +40,9 @@ const TEMPLATE_ITEMS = [
 ];
 
 export default function TemplatePanel() {
+  const addElement = useEditorStore((s) => s.addElement);
+  const currentPage = useEditorStore((s) => s.currentPage);
+
   const handleDragStart = useCallback(
     (e: React.DragEvent, item: (typeof TEMPLATE_ITEMS)[0]) => {
       e.dataTransfer.setData('application/json', JSON.stringify(item));
@@ -25,6 +50,11 @@ export default function TemplatePanel() {
     },
     [],
   );
+
+  const handleAddGuideLine = useCallback(() => {
+    const gl = createGuideLine(currentPage);
+    addElement(gl);
+  }, [currentPage, addElement]);
 
   return (
     <aside className="w-60 bg-white border-r border-gray-300 flex flex-col flex-shrink-0">
@@ -46,10 +76,25 @@ export default function TemplatePanel() {
             <span className="text-sm font-medium text-gray-700">{item.label}</span>
           </div>
         ))}
+
+        {/* Separator */}
+        <div className="border-t border-gray-200 pt-2">
+          <p className="text-[10px] text-gray-400 uppercase px-1 mb-1">Guides</p>
+          <button
+            onClick={handleAddGuideLine}
+            className="w-full flex items-center gap-3 p-3 bg-gray-50 border border-dashed border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-colors text-left"
+            data-testid="template-guideline"
+          >
+            <span className="text-lg w-8 h-8 flex items-center justify-center bg-white rounded border border-gray-300 text-blue-500">
+              ─
+            </span>
+            <span className="text-sm font-medium text-gray-700">Add Guide Line</span>
+          </button>
+        </div>
       </div>
       <div className="p-3 border-t border-gray-200">
         <p className="text-xs text-gray-400 text-center">
-          Drag elements onto the canvas
+          Drag elements or click to add guides
         </p>
       </div>
     </aside>

@@ -126,7 +126,7 @@ export function useResize() {
       e.preventDefault();
 
       const element = useEditorStore.getState().elements[elementId];
-      if (!element) return;
+      if (!element || element.type === 'guideline') return;
 
       resizeRef.current = {
         elementId,

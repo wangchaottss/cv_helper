@@ -1,8 +1,4 @@
-// ============================================================
-// HTML serialization / deserialization
-// ============================================================
-
-import type { CanvasElement, TextElement, ImageElement } from '../types/elements';
+import type { CanvasElement, TextElement, ImageElement, GuideLineElement } from '../types/elements';
 
 const META_SCRIPT_ID = 'cv-editor-data';
 const CANVAS_CLASS = 'cv-a4-canvas';
@@ -14,9 +10,6 @@ interface ArchiveMeta {
   zoom: number;
 }
 
-/**
- * Serialize the canvas state into a self-contained HTML document string.
- */
 export function serializeToHTML(
   elements: CanvasElement[],
   meta: ArchiveMeta,
@@ -27,18 +20,24 @@ export function serializeToHTML(
 
   const elementsHTML = elements
     .map((el) => {
-      const common = `position:absolute;left:${el.x}px;top:${el.y}px;width:${el.width}px;height:${el.height}px;z-index:${el.zIndex};box-sizing:border-box;`;
-
+      if (el.type === 'guideline') {
+        const glColor = el.color;
+        if (el.orientation === 'horizontal') {
+          return `<div class="${ELEMENT_CLASS}" data-id="${el.id}" data-type="guideline" data-orientation="horizontal" data-color="${glColor}" data-name="${el.name}" style="position:absolute;left:0;top:${el.position}px;width:100%;height:0;border-top:1.5px solid ${glColor};"><span style="position:absolute;left:4px;top:-14px;font-size:11px;font-weight:600;color:${glColor}">${el.name}</span></div>`;
+        }
+        return `<div class="${ELEMENT_CLASS}" data-id="${el.id}" data-type="guideline" data-orientation="vertical" data-color="${glColor}" data-name="${el.name}" style="position:absolute;top:0;left:${el.position}px;height:100%;width:0;border-left:1.5px solid ${glColor};"><span style="position:absolute;top:4px;left:6px;font-size:11px;font-weight:600;color:${glColor}">${el.name}</span></div>`;
+      }
       if (el.type === 'text') {
+        const common = `position:absolute;left:${el.x}px;top:${el.y}px;width:${el.width}px;height:${el.height}px;z-index:${el.zIndex};box-sizing:border-box;`;
         const textStyle = `font-family:${el.defaultFontFamily};font-size:${el.defaultFontSize}px;color:${el.defaultColor};font-weight:${el.defaultFontWeight};font-style:${el.defaultFontStyle};text-align:${el.defaultTextAlign};line-height:${el.defaultLineHeight};background-color:${el.defaultBackgroundColor};padding:4px;overflow:hidden;word-break:break-word;`;
         return `<div class="${ELEMENT_CLASS}" data-id="${el.id}" data-type="text" style="${common}${textStyle}">${el.contentHTML}</div>`;
-      } else {
-        const imgStyle = `display:flex;align-items:center;justify-content:center;overflow:hidden;`;
-        const imgTag = el.src
-          ? `<img src="${el.src}" style="width:100%;height:100%;object-fit:${el.objectFit};" alt="" />`
-          : `<span style="color:#9ca3af;font-size:14px;">Image Placeholder</span>`;
-        return `<div class="${ELEMENT_CLASS}" data-id="${el.id}" data-type="image" data-object-fit="${el.objectFit}" style="${common}${imgStyle}">${imgTag}</div>`;
       }
+      const common = `position:absolute;left:${el.x}px;top:${el.y}px;width:${el.width}px;height:${el.height}px;z-index:${el.zIndex};box-sizing:border-box;`;
+      const imgStyle = `display:flex;align-items:center;justify-content:center;overflow:hidden;`;
+      const imgTag = el.src
+        ? `<img src="${el.src}" style="width:100%;height:100%;object-fit:${el.objectFit};" alt="" />`
+        : `<span style="color:#9ca3af;font-size:14px;">Image Placeholder</span>`;
+      return `<div class="${ELEMENT_CLASS}" data-id="${el.id}" data-type="image" data-object-fit="${el.objectFit}" style="${common}${imgStyle}">${imgTag}</div>`;
     })
     .join('\n');
 
@@ -47,6 +46,9 @@ export function serializeToHTML(
     timestamp: meta.timestamp,
     zoom: meta.zoom,
     elements: elements.map((el) => {
+      if (el.type === 'guideline') {
+        return { id: el.id, type: 'guideline', orientation: el.orientation, position: el.position, color: el.color, name: el.name, pageIndex: el.pageIndex };
+      }
       const base = { id: el.id, type: el.type, x: el.x, y: el.y, width: el.width, height: el.height, rotation: el.rotation, zIndex: el.zIndex, pageIndex: el.pageIndex };
       if (el.type === 'text') {
         return { ...base, type: 'text', contentHTML: el.contentHTML, defaultFontFamily: el.defaultFontFamily, defaultFontSize: el.defaultFontSize, defaultColor: el.defaultColor, defaultFontWeight: el.defaultFontWeight, defaultFontStyle: el.defaultFontStyle, defaultTextAlign: el.defaultTextAlign, defaultLineHeight: el.defaultLineHeight, defaultBackgroundColor: el.defaultBackgroundColor };
@@ -85,9 +87,6 @@ ${metaJSON}
 </html>`;
 }
 
-/**
- * Deserialize an HTML document string back into CanvasElements.
- */
 export function deserializeFromHTML(
   htmlString: string,
 ): { elements: CanvasElement[]; meta: ArchiveMeta } | null {
@@ -95,10 +94,8 @@ export function deserializeFromHTML(
     const parser = new DOMParser();
     const doc = parser.parseFromString(htmlString, 'text/html');
 
-    // Extract metadata JSON
     const metaScript = doc.getElementById(META_SCRIPT_ID);
     if (!metaScript || !metaScript.textContent) {
-      // Fallback: try parsing from DOM elements
       return parseFromDOM(doc);
     }
 
@@ -109,19 +106,28 @@ export function deserializeFromHTML(
       zoom: data.zoom || 1,
     };
 
-    // Use elements from metadata if available
     if (data.elements && Array.isArray(data.elements)) {
       const elements: CanvasElement[] = data.elements.map((raw: Record<string, unknown>) => {
+        if (raw.type === 'guideline') {
+          return {
+            id: raw.id as string,
+            type: 'guideline',
+            orientation: (raw.orientation as 'horizontal' | 'vertical') || 'horizontal',
+            position: (raw.position as number) || 561,
+            color: (raw.color as string) || '#3b82f6',
+            name: (raw.name as string) || 'A?',
+            pageIndex: (raw.pageIndex as number) ?? 0,
+          } as GuideLineElement;
+        }
         if (raw.type === 'text') {
           return {
             id: raw.id as string,
             type: 'text',
-            x: raw.x as number,
-            y: raw.y as number,
-            width: raw.width as number,
-            height: raw.height as number,
+            x: raw.x as number, y: raw.y as number,
+            width: raw.width as number, height: raw.height as number,
             rotation: (raw.rotation as number) || 0,
             zIndex: (raw.zIndex as number) || 1,
+            pageIndex: (raw.pageIndex as number) ?? 0,
             contentHTML: (raw.contentHTML as string) || '',
             defaultFontFamily: (raw.defaultFontFamily as string) || 'Inter',
             defaultFontSize: (raw.defaultFontSize as number) || 16,
@@ -134,12 +140,9 @@ export function deserializeFromHTML(
           } as TextElement;
         }
         return {
-          id: raw.id as string,
-          type: 'image',
-          x: raw.x as number,
-          y: raw.y as number,
-          width: raw.width as number,
-          height: raw.height as number,
+          id: raw.id as string, type: 'image',
+          x: raw.x as number, y: raw.y as number,
+          width: raw.width as number, height: raw.height as number,
           rotation: (raw.rotation as number) || 0,
           zIndex: (raw.zIndex as number) || 1,
           pageIndex: (raw.pageIndex as number) ?? 0,
@@ -147,10 +150,8 @@ export function deserializeFromHTML(
           objectFit: ((raw.objectFit as string) || 'contain') as ImageElement['objectFit'],
         } as ImageElement;
       });
-
       return { elements, meta };
     }
-
     return parseFromDOM(doc);
   } catch (err) {
     console.error('Failed to deserialize HTML:', err);
@@ -158,12 +159,7 @@ export function deserializeFromHTML(
   }
 }
 
-/**
- * Fallback: parse elements from DOM nodes when JSON metadata is unavailable
- */
-function parseFromDOM(
-  doc: Document,
-): { elements: CanvasElement[]; meta: ArchiveMeta } | null {
+function parseFromDOM(doc: Document): { elements: CanvasElement[]; meta: ArchiveMeta } | null {
   const elementDivs = doc.querySelectorAll(`.${ELEMENT_CLASS}`);
   if (elementDivs.length === 0) return null;
 
@@ -176,6 +172,18 @@ function parseFromDOM(
     const dataId = el.dataset['id'] || `restored-${idCounter++}`;
     const dataType = el.dataset['type'] || 'text';
 
+    if (dataType === 'guideline') {
+      const orientation = (el.dataset['orientation'] as 'horizontal' | 'vertical') || 'horizontal';
+      elements.push({
+        id: dataId, type: 'guideline', orientation,
+        position: orientation === 'horizontal' ? (parseFloat(style.top) || 0) : (parseFloat(style.left) || 0),
+        color: el.dataset['color'] || '#3b82f6',
+        name: el.dataset['name'] || 'A?',
+        pageIndex: 0,
+      } as GuideLineElement);
+      continue;
+    }
+
     const x = parseFloat(style.left) || 0;
     const y = parseFloat(style.top) || 0;
     const width = parseFloat(style.width) || 100;
@@ -183,9 +191,7 @@ function parseFromDOM(
 
     if (dataType === 'text') {
       elements.push({
-        id: dataId,
-        type: 'text',
-        x, y, width, height,
+        id: dataId, type: 'text', x, y, width, height,
         rotation: 0, pageIndex: 0,
         zIndex: parseInt(style.zIndex) || 1,
         contentHTML: el.innerHTML || '',
@@ -201,9 +207,7 @@ function parseFromDOM(
     } else {
       const img = el.querySelector('img');
       elements.push({
-        id: dataId,
-        type: 'image',
-        x, y, width, height,
+        id: dataId, type: 'image', x, y, width, height,
         rotation: 0, pageIndex: 0,
         zIndex: parseInt(style.zIndex) || 1,
         src: img?.src || '',
@@ -211,9 +215,5 @@ function parseFromDOM(
       } as ImageElement);
     }
   }
-
-  return {
-    elements,
-    meta: { version: '0.1.0', timestamp: Date.now(), zoom: 1 },
-  };
+  return { elements, meta: { version: '0.1.0', timestamp: Date.now(), zoom: 1 } };
 }

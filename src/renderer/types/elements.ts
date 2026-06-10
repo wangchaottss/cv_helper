@@ -36,7 +36,17 @@ export interface ImageElement extends BaseElement {
   objectFit: ImageObjectFit;
 }
 
-export type CanvasElement = TextElement | ImageElement;
+export interface GuideLineElement {
+  id: string;
+  type: 'guideline';
+  orientation: 'horizontal' | 'vertical';
+  position: number; // logical px — y for horizontal, x for vertical
+  color: string;
+  name: string; // A1, A2, ...
+  pageIndex: number;
+}
+
+export type CanvasElement = TextElement | ImageElement | GuideLineElement;
 
 export interface SystemFont {
   family: string;

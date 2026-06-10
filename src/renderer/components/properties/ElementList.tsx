@@ -3,20 +3,22 @@ import { useEditorStore } from '../../store/editorStore';
 import type { CanvasElement, TextElement, ImageElement } from '../../types/elements';
 
 function getElementLabel(el: CanvasElement): string {
+  if (el.type === 'guideline') {
+    return `${el.name} (${el.orientation === 'horizontal' ? 'H' : 'V'})`;
+  }
   if (el.type === 'text') {
     const text = (el as TextElement).contentHTML.replace(/<[^>]*>/g, '').trim();
     if (!text) return '[Empty text]';
     return text.length > 10 ? text.slice(0, 10) + '...' : text;
   }
-  // Image
   const img = el as ImageElement;
   if (!img.src) return '[Image placeholder]';
-  // Extract filename from data URL or path
   const match = img.src.match(/\/([^/]+\.(png|jpg|jpeg|gif|webp|bmp|svg))/i);
   return match ? match[1] : '[Image]';
 }
 
 function getElementIcon(el: CanvasElement): string {
+  if (el.type === 'guideline') return el.orientation === 'horizontal' ? '━' : '┃';
   return el.type === 'text' ? 'T' : '🖼';
 }
 

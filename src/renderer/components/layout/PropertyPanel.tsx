@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import TextProperties from '../properties/TextProperties';
 import ImageProperties from '../properties/ImageProperties';
+import GuidelineProperties from '../properties/GuidelineProperties';
 import ElementList from '../properties/ElementList';
 import type { TextElement, ImageElement, CanvasElement } from '../../types/elements';
 
@@ -9,26 +10,28 @@ import type { TextElement, ImageElement, CanvasElement } from '../../types/eleme
 // Z-order helpers
 // ============================================================
 
+// Exclude guidelines from z-order — they don't have zIndex
+function zElements() {
+  return Object.values(useEditorStore.getState().elements).filter((el) => el.type !== 'guideline') as Array<TextElement | ImageElement>;
+}
+
 function bringToFront(id: string) {
   const store = useEditorStore.getState();
-  const elements = Object.values(store.elements);
-  const maxZ = elements.reduce((max, el) => Math.max(max, el.zIndex), 0);
+  const maxZ = zElements().reduce((max, el) => Math.max(max, el.zIndex), 0);
   store.updateElement(id, { zIndex: maxZ + 1 });
 }
 
 function sendToBack(id: string) {
   const store = useEditorStore.getState();
-  const elements = Object.values(store.elements);
-  const minZ = elements.reduce((min, el) => Math.min(min, el.zIndex), Infinity);
+  const minZ = zElements().reduce((min, el) => Math.min(min, el.zIndex), Infinity);
   store.updateElement(id, { zIndex: minZ - 1 });
 }
 
 function bringForward(id: string) {
   const store = useEditorStore.getState();
   const current = store.elements[id];
-  if (!current) return;
-  const elements = Object.values(store.elements);
-  const nextHigher = elements
+  if (!current || current.type === 'guideline') return;
+  const nextHigher = zElements()
     .filter((el) => el.zIndex > current.zIndex)
     .sort((a, b) => a.zIndex - b.zIndex)[0];
   if (nextHigher) {
@@ -40,9 +43,8 @@ function bringForward(id: string) {
 function sendBackward(id: string) {
   const store = useEditorStore.getState();
   const current = store.elements[id];
-  if (!current) return;
-  const elements = Object.values(store.elements);
-  const nextLower = elements
+  if (!current || current.type === 'guideline') return;
+  const nextLower = zElements()
     .filter((el) => el.zIndex < current.zIndex)
     .sort((a, b) => b.zIndex - a.zIndex)[0];
   if (nextLower) {
@@ -119,8 +121,15 @@ export default function PropertyPanel() {
           />
         )}
 
-        {/* Z-order controls */}
-        {selectedElement && (
+        {selectedElement && selectedElement.type === 'guideline' && (
+          <GuidelineProperties
+            element={selectedElement}
+            onUpdate={handleUpdate}
+          />
+        )}
+
+        {/* Z-order controls (not for guidelines) */}
+        {selectedElement && selectedElement.type !== 'guideline' && (
           <div className="pt-3 border-t border-gray-100">
             <label className="block text-[11px] font-medium text-gray-500 mb-2 uppercase tracking-wide">
               Layer Order

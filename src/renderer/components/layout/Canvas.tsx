@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { getCanvasBounds } from '../../utils/coordinates';
 import { useDragDrop } from '../../hooks/useDragDrop';
@@ -6,6 +6,7 @@ import { useElementDrag } from '../../hooks/useElementDrag';
 import { useResize } from '../../hooks/useResize';
 import { useMarqueeSelect } from '../../hooks/useMarqueeSelect';
 import CanvasElement from '../canvas/CanvasElement';
+import GuideLineRenderer from '../canvas/GuideLineRenderer';
 import GuideLines from '../canvas/GuideLines';
 import MultiSelectOverlay from '../canvas/MultiSelectOverlay';
 
@@ -31,7 +32,6 @@ export default function Canvas() {
   const wrapperW = canvasBounds.width * zoom + pad * 2;
   const wrapperH = canvasBounds.height * zoom + pad * 2;
 
-  // Initial zoom-to-fit on mount
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return;
@@ -42,7 +42,6 @@ export default function Canvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Zoom with Ctrl+wheel
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
       if (e.ctrlKey || e.metaKey) {
@@ -54,7 +53,6 @@ export default function Canvas() {
     [zoom, setZoom],
   );
 
-  // Combined ref: wire dragDrop ref + keep canvasInnerRef
   const innerRefCallback = useCallback(
     (el: HTMLDivElement | null) => {
       setCanvasRef(el);
@@ -79,38 +77,37 @@ export default function Canvas() {
       data-testid="canvas-area"
     >
       <div style={{ display: 'flex', minHeight: '100%', minWidth: 'fit-content' }}>
-        <div
-          style={{
-            margin: 'auto',
-            width: `${wrapperW}px`,
-            height: `${wrapperH}px`,
-            padding: `${pad}px`,
-          }}
-        >
+        <div style={{ margin: 'auto', width: `${wrapperW}px`, height: `${wrapperH}px`, padding: `${pad}px` }}>
           <div style={{ transform: `scale(${zoom})`, transformOrigin: '0 0' }}>
             <div
               ref={innerRefCallback}
               data-canvas-inner="true"
               className="bg-white shadow-xl relative"
-              style={{
-                width: `${canvasBounds.width}px`,
-                height: `${canvasBounds.height}px`,
-              }}
+              style={{ width: `${canvasBounds.width}px`, height: `${canvasBounds.height}px` }}
               data-testid="a4-canvas"
             >
-              {elementList.map((el) => (
-                <CanvasElement
-                  key={el.id}
-                  element={el}
-                  isSelected={selection.includes(el.id)}
-                  onPointerDown={onPointerDown}
-                  onResizeStart={onResizeStart}
-                />
-              ))}
+              {/* Render guidelines before other elements so they're underneath */}
+              {elementList
+                .filter((el) => el.type === 'guideline')
+                .map((el) => (
+                  <GuideLineRenderer key={el.id} element={el} />
+                ))}
+
+              {elementList
+                .filter((el) => el.type !== 'guideline')
+                .map((el) => (
+                  <CanvasElement
+                    key={el.id}
+                    element={el}
+                    isSelected={selection.includes(el.id)}
+                    onPointerDown={onPointerDown}
+                    onResizeStart={onResizeStart}
+                  />
+                ))}
+
               <MultiSelectOverlay />
               <GuideLines />
 
-              {/* Marquee selection rectangle */}
               {marquee && (
                 <div
                   style={{

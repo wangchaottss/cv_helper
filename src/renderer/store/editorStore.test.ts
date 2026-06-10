@@ -85,10 +85,10 @@ describe('editorStore', () => {
       useEditorStore.getState().updateElement('text-1', { x: 150, y: 250 });
 
       const state = useEditorStore.getState();
-      expect(state.elements['text-1'].x).toBe(150);
-      expect(state.elements['text-1'].y).toBe(250);
+      const el = state.elements['text-1']; if (el.type !== 'guideline') expect(el.x).toBe(150);
+      if (el.type !== 'guideline') expect(el.y).toBe(250);
       // Other props unchanged
-      expect(state.elements['text-1'].width).toBe(300);
+      if (el.type !== 'guideline') expect(el.width).toBe(300);
     });
 
     it('does nothing for non-existent element', () => {

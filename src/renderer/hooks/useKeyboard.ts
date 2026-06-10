@@ -79,10 +79,21 @@ export function useKeyboard() {
         const el = useEditorStore.getState().elements[id];
         if (!el) continue;
 
-        const newX = el.x + dx;
-        const newY = el.y + dy;
-        const clamped = clampToCanvas(newX, newY, el.width, el.height, canvasBounds);
-        updateElement(id, { x: clamped.x, y: clamped.y });
+        if (el.type === 'guideline') {
+          // Guidelines: move only along their perpendicular axis
+          if (el.orientation === 'horizontal') {
+            const newPos = Math.max(0, Math.min(canvasBounds.height, el.position + dy));
+            updateElement(id, { position: newPos });
+          } else {
+            const newPos = Math.max(0, Math.min(canvasBounds.width, el.position + dx));
+            updateElement(id, { position: newPos });
+          }
+        } else {
+          const newX = el.x + dx;
+          const newY = el.y + dy;
+          const clamped = clampToCanvas(newX, newY, el.width, el.height, canvasBounds);
+          updateElement(id, { x: clamped.x, y: clamped.y });
+        }
       }
     };
 

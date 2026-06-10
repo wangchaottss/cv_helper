@@ -16,6 +16,7 @@ export function buildPrintHTML(
   const a4Height = 1123;
 
   const elementsHTML = elements
+    .filter((el) => el.type !== 'guideline') // guidelines not shown in PDF
     .map((el) => {
       const common = `position:absolute;left:${el.x}px;top:${el.y}px;width:${el.width}px;height:${el.height}px;z-index:${el.zIndex};box-sizing:border-box;`;
 

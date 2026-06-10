@@ -78,19 +78,22 @@ describe('useKeyboard — store-level logic', () => {
     it('updateElement moves element by 1px right', () => {
       useEditorStore.getState().addElement(makeTextElement({ id: 'e1', x: 100, y: 100 }));
       useEditorStore.getState().updateElement('e1', { x: 101, y: 100 });
-      expect(useEditorStore.getState().elements['e1'].x).toBe(101);
+      const el = useEditorStore.getState().elements['e1'];
+      if (el.type === 'text') expect(el.x).toBe(101);
     });
 
     it('updateElement moves element by 1px up', () => {
       useEditorStore.getState().addElement(makeTextElement({ id: 'e1', x: 100, y: 100 }));
       useEditorStore.getState().updateElement('e1', { x: 100, y: 99 });
-      expect(useEditorStore.getState().elements['e1'].y).toBe(99);
+      const el = useEditorStore.getState().elements['e1'];
+      if (el.type === 'text') expect(el.y).toBe(99);
     });
 
     it('updateElement moves element by 10px (Shift)', () => {
       useEditorStore.getState().addElement(makeTextElement({ id: 'e1', x: 100, y: 100 }));
       useEditorStore.getState().updateElement('e1', { x: 110, y: 100 });
-      expect(useEditorStore.getState().elements['e1'].x).toBe(110);
+      const el = useEditorStore.getState().elements['e1'];
+      if (el.type === 'text') expect(el.x).toBe(110);
     });
   });
 });
