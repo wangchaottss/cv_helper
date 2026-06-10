@@ -1,27 +1,29 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { getCanvasBounds } from '../../utils/coordinates';
 import { useDragDrop } from '../../hooks/useDragDrop';
 import { useElementDrag } from '../../hooks/useElementDrag';
 import { useResize } from '../../hooks/useResize';
+import { useMarqueeSelect } from '../../hooks/useMarqueeSelect';
 import CanvasElement from '../canvas/CanvasElement';
 import GuideLines from '../canvas/GuideLines';
 import MultiSelectOverlay from '../canvas/MultiSelectOverlay';
 
-const PADDING_LOGICAL = 8; // logical px — scales with zoom
+const PADDING_LOGICAL = 8;
 
 export default function Canvas() {
   const canvasRef = useRef<HTMLDivElement>(null);
+  const canvasInnerRef = useRef<HTMLDivElement | null>(null);
 
   const zoom = useEditorStore((s) => s.zoom);
   const elements = useEditorStore((s) => s.elements);
   const selection = useEditorStore((s) => s.selection);
-  const setSelection = useEditorStore((s) => s.setSelection);
   const setZoom = useEditorStore((s) => s.setZoom);
 
   const { setCanvasRef, handleDragOver, handleDragLeave, handleDrop } = useDragDrop();
   const { onPointerDown } = useElementDrag();
   const { onResizeStart } = useResize();
+  const { marquee, onCanvasMouseDown, onCanvasMouseMove, onCanvasMouseUp } = useMarqueeSelect();
 
   const canvasBounds = getCanvasBounds();
   const pad = PADDING_LOGICAL * zoom;
@@ -39,18 +41,7 @@ export default function Canvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Click on canvas background to deselect
-  const handleCanvasClick = useCallback(
-    (e: React.MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (target === canvasRef.current || target.dataset['canvasInner'] === 'true') {
-        setSelection([]);
-      }
-    },
-    [setSelection],
-  );
-
-  // Zoom with pinch / Ctrl+wheel
+  // Zoom with Ctrl+wheel
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
       if (e.ctrlKey || e.metaKey) {
@@ -62,12 +53,16 @@ export default function Canvas() {
     [zoom, setZoom],
   );
 
-  const elementList = Object.values(elements);
-
+  // Combined ref: wire dragDrop ref + keep canvasInnerRef
   const innerRefCallback = useCallback(
-    (el: HTMLDivElement | null) => setCanvasRef(el),
+    (el: HTMLDivElement | null) => {
+      setCanvasRef(el);
+      canvasInnerRef.current = el;
+    },
     [setCanvasRef],
   );
+
+  const elementList = Object.values(elements);
 
   return (
     <main
@@ -76,11 +71,12 @@ export default function Canvas() {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      onClick={handleCanvasClick}
+      onMouseDown={(e) => onCanvasMouseDown(e, canvasInnerRef.current)}
+      onMouseMove={(e) => onCanvasMouseMove(e, canvasInnerRef.current)}
+      onMouseUp={onCanvasMouseUp}
       onWheel={handleWheel}
       data-testid="canvas-area"
     >
-      {/* Flex wrapper: margin:auto centers A4 when it fits; margins → 0 when overflow */}
       <div style={{ display: 'flex', minHeight: '100%', minWidth: 'fit-content' }}>
         <div
           style={{
@@ -112,6 +108,24 @@ export default function Canvas() {
               ))}
               <MultiSelectOverlay />
               <GuideLines />
+
+              {/* Marquee selection rectangle */}
+              {marquee && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: `${marquee.x}px`,
+                    top: `${marquee.y}px`,
+                    width: `${marquee.width}px`,
+                    height: `${marquee.height}px`,
+                    border: '1.5px dashed #2563eb',
+                    backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                    pointerEvents: 'none',
+                    zIndex: 9999,
+                  }}
+                  data-testid="marquee-selection"
+                />
+              )}
             </div>
           </div>
         </div>
