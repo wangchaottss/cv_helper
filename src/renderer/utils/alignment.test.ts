@@ -84,10 +84,26 @@ describe('detectAlignments', () => {
   });
 
   it('detects canvas vertical midline', () => {
-    const moving = getElementRect({ x: 395, y: 100, width: 100, height: 50 });
+    // centerX = 395 + 50 = 445. canvas centerX = 794/2 = 397. diff = 48 > 5, no snap
+    // Use an element actually near the midline
+    const moving = getElementRect({ x: 345, y: 100, width: 100, height: 50 });
+    // centerX = 345 + 50 = 395. canvas centerX = 397. diff = 2 < 5
     const result = detectAlignments(moving, [], CANVAS_BOUNDS);
-
     expect(result.vertical).toContain(397);
+  });
+
+  it('snaps to canvas left border', () => {
+    const moving = getElementRect({ x: 3, y: 100, width: 100, height: 50 });
+    const result = detectAlignments(moving, [], CANVAS_BOUNDS);
+    expect(result.vertical).toContain(0); // canvas left edge
+    expect(result.snapX).toBe(-3);
+  });
+
+  it('snaps to canvas right border', () => {
+    const moving = getElementRect({ x: 692, y: 100, width: 100, height: 50 });
+    const result = detectAlignments(moving, [], CANVAS_BOUNDS);
+    expect(result.vertical).toContain(794); // canvas right edge
+    expect(result.snapX).toBe(2);
   });
 
   it('returns no alignment when distance > threshold', () => {

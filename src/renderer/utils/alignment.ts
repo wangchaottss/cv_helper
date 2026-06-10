@@ -1,13 +1,9 @@
-// ============================================================
 // Alignment detection & snap engine
-// ============================================================
 
 export interface CanvasBounds {
   width: number;
   height: number;
 }
-
-const DEFAULT_THRESHOLD = 5; // px
 
 export interface ElementRect {
   left: number;
@@ -17,6 +13,8 @@ export interface ElementRect {
   centerX: number;
   centerY: number;
 }
+
+const SNAP_THRESHOLD = 5; // px
 
 export function getElementRect(element: { x: number; y: number; width: number; height: number }): ElementRect {
   return {
@@ -29,34 +27,18 @@ export function getElementRect(element: { x: number; y: number; width: number; h
   };
 }
 
-/**
- * Compute the bounding box of multiple elements (for multi-select alignment)
- */
 export function getBoundingRect(elements: Array<{ x: number; y: number; width: number; height: number }>): ElementRect {
   if (elements.length === 0) {
     return { left: 0, right: 0, top: 0, bottom: 0, centerX: 0, centerY: 0 };
   }
-
-  let left = Infinity;
-  let right = -Infinity;
-  let top = Infinity;
-  let bottom = -Infinity;
-
+  let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
   for (const el of elements) {
     left = Math.min(left, el.x);
     right = Math.max(right, el.x + el.width);
     top = Math.min(top, el.y);
     bottom = Math.max(bottom, el.y + el.height);
   }
-
-  return {
-    left,
-    right,
-    top,
-    bottom,
-    centerX: (left + right) / 2,
-    centerY: (top + bottom) / 2,
-  };
+  return { left, right, top, bottom, centerX: (left + right) / 2, centerY: (top + bottom) / 2 };
 }
 
 export interface AlignmentResult {
@@ -66,105 +48,90 @@ export interface AlignmentResult {
   snapY: number | null;
 }
 
+interface SnapCandidate {
+  pos: number;    // guide line position
+  offset: number; // correction to apply to element
+  dist: number;   // distance
+}
+
 /**
- * Detect alignment between a moving element and other elements + canvas midlines.
- * Returns guide line positions and optional snap correction.
+ * Detect closest alignment between moving element and canvas borders/midlines + other element edges.
+ * Returns guide line positions AND the correction (snap) for the single closest match per axis.
  */
 export function detectAlignments(
   movingRect: ElementRect,
   otherRects: ElementRect[],
   canvasBounds: CanvasBounds,
-  threshold: number = DEFAULT_THRESHOLD,
+  threshold: number = SNAP_THRESHOLD,
 ): AlignmentResult {
-  const horizontal: number[] = [];
-  const vertical: number[] = [];
-  let snapX: number | null = null;
-  let snapY: number | null = null;
-  let minDistX = threshold + 1;
-  let minDistY = threshold + 1;
+  // Build reference points — each has left/right/top/bottom/centerX/centerY
+  const refs: ElementRect[] = [...otherRects];
 
-  // Canvas midlines are always reference points
-  const canvasMidX = canvasBounds.width / 2;
-  const canvasMidY = canvasBounds.height / 2;
+  // Canvas borders as a full-rect reference (edges + center)
+  refs.push({
+    left: 0,
+    right: canvasBounds.width,
+    top: 0,
+    bottom: canvasBounds.height,
+    centerX: canvasBounds.width / 2,
+    centerY: canvasBounds.height / 2,
+  });
 
-  const allRefs = [
-    ...otherRects,
-    // Virtual canvas midline "element" (center only)
-    {
-      left: canvasMidX,
-      right: canvasMidX,
-      top: canvasMidY,
-      bottom: canvasMidY,
-      centerX: canvasMidX,
-      centerY: canvasMidY,
-    },
-  ];
+  // Collect ALL vertical snap candidates (x-axis guides)
+  const vCandidates: SnapCandidate[] = [];
+  for (const ref of refs) {
+    // Moving left ↔ ref left
+    vCandidates.push({ pos: ref.left, offset: ref.left - movingRect.left, dist: Math.abs(movingRect.left - ref.left) });
+    // Moving right ↔ ref right
+    vCandidates.push({ pos: ref.right, offset: ref.right - movingRect.right, dist: Math.abs(movingRect.right - ref.right) });
+    // Moving centerX ↔ ref centerX
+    vCandidates.push({ pos: ref.centerX, offset: ref.centerX - movingRect.centerX, dist: Math.abs(movingRect.centerX - ref.centerX) });
+  }
 
-  for (const ref of allRefs) {
-    // --- Horizontal alignments (vertical guide lines) ---
-    // Left edge alignment
-    const distLeft = Math.abs(movingRect.left - ref.left);
-    if (distLeft < threshold && distLeft <= minDistX) {
-      if (distLeft < minDistX) { vertical.length = 0; minDistX = distLeft; }
-      vertical.push(ref.left);
-      snapX = ref.left - movingRect.left;
-    }
-    // Right edge alignment
-    const distRight = Math.abs(movingRect.right - ref.right);
-    if (distRight < threshold && distRight <= minDistX) {
-      if (distRight < minDistX) { vertical.length = 0; minDistX = distRight; }
-      vertical.push(ref.right);
-      snapX = ref.right - movingRect.right;
-    }
-    // Horizontal center alignment
-    const distCenterX = Math.abs(movingRect.centerX - ref.centerX);
-    if (distCenterX < threshold && distCenterX <= minDistX) {
-      if (distCenterX < minDistX) { vertical.length = 0; minDistX = distCenterX; }
-      vertical.push(ref.centerX);
-      snapX = ref.centerX - movingRect.centerX;
-    }
+  // Collect ALL horizontal snap candidates (y-axis guides)
+  const hCandidates: SnapCandidate[] = [];
+  for (const ref of refs) {
+    hCandidates.push({ pos: ref.top, offset: ref.top - movingRect.top, dist: Math.abs(movingRect.top - ref.top) });
+    hCandidates.push({ pos: ref.bottom, offset: ref.bottom - movingRect.bottom, dist: Math.abs(movingRect.bottom - ref.bottom) });
+    hCandidates.push({ pos: ref.centerY, offset: ref.centerY - movingRect.centerY, dist: Math.abs(movingRect.centerY - ref.centerY) });
+  }
 
-    // --- Vertical alignments (horizontal guide lines) ---
-    // Top edge alignment
-    const distTop = Math.abs(movingRect.top - ref.top);
-    if (distTop < threshold && distTop <= minDistY) {
-      if (distTop < minDistY) { horizontal.length = 0; minDistY = distTop; }
-      horizontal.push(ref.top);
-      snapY = ref.top - movingRect.top;
-    }
-    // Bottom edge alignment
-    const distBottom = Math.abs(movingRect.bottom - ref.bottom);
-    if (distBottom < threshold && distBottom <= minDistY) {
-      if (distBottom < minDistY) { horizontal.length = 0; minDistY = distBottom; }
-      horizontal.push(ref.bottom);
-      snapY = ref.bottom - movingRect.bottom;
-    }
-    // Vertical center alignment
-    const distCenterY = Math.abs(movingRect.centerY - ref.centerY);
-    if (distCenterY < threshold && distCenterY <= minDistY) {
-      if (distCenterY < minDistY) { horizontal.length = 0; minDistY = distCenterY; }
-      horizontal.push(ref.centerY);
-      snapY = ref.centerY - movingRect.centerY;
+  // Find the single closest snap per axis
+  let bestV: SnapCandidate | null = null;
+  for (const c of vCandidates) {
+    if (c.dist < threshold && (!bestV || c.dist < bestV.dist)) {
+      bestV = c;
     }
   }
 
-  // Deduplicate guide line positions
+  let bestH: SnapCandidate | null = null;
+  for (const c of hCandidates) {
+    if (c.dist < threshold && (!bestH || c.dist < bestH.dist)) {
+      bestH = c;
+    }
+  }
+
+  // Collect all guide lines within threshold (for visual rendering)
+  const vertical: number[] = [];
+  for (const c of vCandidates) {
+    if (c.dist < threshold) vertical.push(c.pos);
+  }
+  const horizontal: number[] = [];
+  for (const c of hCandidates) {
+    if (c.dist < threshold) horizontal.push(c.pos);
+  }
+
   return {
     horizontal: [...new Set(horizontal)],
     vertical: [...new Set(vertical)],
-    snapX,
-    snapY,
+    snapX: bestV?.offset ?? null,
+    snapY: bestH?.offset ?? null,
   };
 }
 
-/**
- * Apply snap correction to element coordinates
- */
 export function applySnap(
-  x: number,
-  y: number,
-  snapX: number | null,
-  snapY: number | null,
+  x: number, y: number,
+  snapX: number | null, snapY: number | null,
 ): { x: number; y: number } {
   return {
     x: snapX !== null ? x + snapX : x,
