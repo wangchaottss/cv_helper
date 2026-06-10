@@ -27,6 +27,7 @@ export const useEditorStore = create<InternalState>((set, get) => ({
   snapEnabled: true,
   guideLines: { horizontal: [], vertical: [] },
   snapTargets: [],
+  currentPage: 0,
   _history: [],
   _future: [],
 
@@ -106,6 +107,43 @@ export const useEditorStore = create<InternalState>((set, get) => ({
 
   setSnapTargets: (ids: string[]) => {
     set({ snapTargets: ids });
+  },
+
+  setCurrentPage: (page: number) => {
+    if (page >= 0) set({ currentPage: page, selection: [] });
+  },
+
+  addPage: () => {
+    const state = get();
+    const allElements = Object.values(state.elements);
+    const maxPage = allElements.reduce((max, el) => Math.max(max, el.pageIndex), 0);
+    set({ currentPage: maxPage + 1, selection: [] });
+  },
+
+  removePage: (pageIndex: number) => {
+    const state = get();
+    // Don't remove the last page
+    const allElements = Object.values(state.elements);
+    const maxPage = allElements.reduce((max, el) => Math.max(max, el.pageIndex), 0);
+    if (maxPage === 0) return;
+
+    // Remove elements on this page
+    const idsToRemove = allElements
+      .filter((el) => el.pageIndex === pageIndex)
+      .map((el) => el.id);
+    state.removeElements(idsToRemove);
+
+    // Shift elements from later pages down
+    for (const [id, el] of Object.entries(state.elements)) {
+      if (el.pageIndex > pageIndex) {
+        state.updateElement(id, { pageIndex: el.pageIndex - 1 });
+      }
+    }
+
+    // Adjust current page
+    const newMax = Math.max(0, maxPage - 1);
+    const newCurrent = Math.min(state.currentPage, newMax);
+    set({ currentPage: newCurrent, selection: [] });
   },
 
   pushHistory: () => {

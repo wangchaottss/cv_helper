@@ -12,6 +12,7 @@ export interface BaseElement {
   height: number;
   rotation: number;
   zIndex: number;
+  pageIndex: number;
 }
 
 export interface TextElement extends BaseElement {
@@ -58,6 +59,7 @@ export interface EditorState {
   snapEnabled: boolean;
   guideLines: GuideLinesData;
   snapTargets: string[];
+  currentPage: number;
 
   // Actions
   addElement: (element: CanvasElement) => void;
@@ -72,6 +74,9 @@ export interface EditorState {
   setGuideLines: (lines: GuideLinesData) => void;
   clearGuides: () => void;
   setSnapTargets: (ids: string[]) => void;
+  setCurrentPage: (page: number) => void;
+  addPage: () => void;
+  removePage: (pageIndex: number) => void;
   pushHistory: () => void;
   undo: () => void;
   redo: () => void;

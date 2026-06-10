@@ -47,7 +47,7 @@ export function serializeToHTML(
     timestamp: meta.timestamp,
     zoom: meta.zoom,
     elements: elements.map((el) => {
-      const base = { id: el.id, type: el.type, x: el.x, y: el.y, width: el.width, height: el.height, rotation: el.rotation, zIndex: el.zIndex };
+      const base = { id: el.id, type: el.type, x: el.x, y: el.y, width: el.width, height: el.height, rotation: el.rotation, zIndex: el.zIndex, pageIndex: el.pageIndex };
       if (el.type === 'text') {
         return { ...base, type: 'text', contentHTML: el.contentHTML, defaultFontFamily: el.defaultFontFamily, defaultFontSize: el.defaultFontSize, defaultColor: el.defaultColor, defaultFontWeight: el.defaultFontWeight, defaultFontStyle: el.defaultFontStyle, defaultTextAlign: el.defaultTextAlign, defaultLineHeight: el.defaultLineHeight, defaultBackgroundColor: el.defaultBackgroundColor };
       }
@@ -142,6 +142,7 @@ export function deserializeFromHTML(
           height: raw.height as number,
           rotation: (raw.rotation as number) || 0,
           zIndex: (raw.zIndex as number) || 1,
+          pageIndex: (raw.pageIndex as number) ?? 0,
           src: (raw.src as string) || '',
           objectFit: ((raw.objectFit as string) || 'contain') as ImageElement['objectFit'],
         } as ImageElement;
@@ -185,7 +186,7 @@ function parseFromDOM(
         id: dataId,
         type: 'text',
         x, y, width, height,
-        rotation: 0,
+        rotation: 0, pageIndex: 0,
         zIndex: parseInt(style.zIndex) || 1,
         contentHTML: el.innerHTML || '',
         defaultFontFamily: style.fontFamily?.replace(/['"]/g, '') || 'Inter',
@@ -203,7 +204,7 @@ function parseFromDOM(
         id: dataId,
         type: 'image',
         x, y, width, height,
-        rotation: 0,
+        rotation: 0, pageIndex: 0,
         zIndex: parseInt(style.zIndex) || 1,
         src: img?.src || '',
         objectFit: (el.dataset['objectFit'] as ImageElement['objectFit']) || 'contain',

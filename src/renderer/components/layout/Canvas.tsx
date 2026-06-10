@@ -18,6 +18,7 @@ export default function Canvas() {
   const zoom = useEditorStore((s) => s.zoom);
   const elements = useEditorStore((s) => s.elements);
   const selection = useEditorStore((s) => s.selection);
+  const currentPage = useEditorStore((s) => s.currentPage);
   const setZoom = useEditorStore((s) => s.setZoom);
 
   const { setCanvasRef, handleDragOver, handleDragLeave, handleDrop } = useDragDrop();
@@ -62,7 +63,7 @@ export default function Canvas() {
     [setCanvasRef],
   );
 
-  const elementList = Object.values(elements);
+  const elementList = Object.values(elements).filter((el) => el.pageIndex === currentPage);
 
   return (
     <main

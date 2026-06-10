@@ -17,7 +17,7 @@ describe('generateId', () => {
 
 describe('createDefaultTextElement', () => {
   it('creates a text element at given position', () => {
-    const el = createDefaultTextElement(100, 200);
+    const el = createDefaultTextElement(100, 200, 0);
     expect(el.type).toBe('text');
     expect(el.x).toBe(100);
     expect(el.y).toBe(200);
@@ -32,7 +32,7 @@ describe('createDefaultTextElement', () => {
 
 describe('createDefaultImageElement', () => {
   it('creates an image element at given position', () => {
-    const el = createDefaultImageElement(50, 50);
+    const el = createDefaultImageElement(50, 50, 0);
     expect(el.type).toBe('image');
     expect(el.x).toBe(50);
     expect(el.y).toBe(50);
@@ -58,7 +58,7 @@ describe('useDragDrop store integration', () => {
   });
 
   it('addElement adds to store', () => {
-    const el = createDefaultTextElement(10, 20);
+    const el = createDefaultTextElement(10, 20, 0);
     useEditorStore.getState().addElement(el);
     expect(Object.keys(useEditorStore.getState().elements)).toHaveLength(1);
   });

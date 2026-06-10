@@ -5,7 +5,7 @@ import type { TextElement } from '../types/elements';
 function makeTextEl(overrides: Partial<TextElement> = {}): TextElement {
   return {
     id: 't1', type: 'text', x: 0, y: 0, width: 100, height: 50,
-    rotation: 0, zIndex: 1, contentHTML: 'Hello',
+    rotation: 0, pageIndex: 0, zIndex: 1, contentHTML: 'Hello',
     defaultFontFamily: 'Inter', defaultFontSize: 16, defaultColor: '#000',
     defaultFontWeight: 400, defaultFontStyle: 'normal',
     defaultTextAlign: 'left', defaultLineHeight: 1.5,

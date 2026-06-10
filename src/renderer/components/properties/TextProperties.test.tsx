@@ -11,6 +11,7 @@ const mockElement: TextElement = {
   width: 300,
   height: 100,
   rotation: 0,
+  pageIndex: 0,
   zIndex: 1,
   contentHTML: 'Hello',
   defaultFontFamily: 'Inter',

@@ -10,7 +10,7 @@ export function generateId(): string {
   return `elem-${Date.now()}-${_elementIdCounter}`;
 }
 
-export function createDefaultTextElement(x: number, y: number): TextElement {
+export function createDefaultTextElement(x: number, y: number, pageIndex: number): TextElement {
   return {
     id: generateId(),
     type: 'text',
@@ -20,6 +20,7 @@ export function createDefaultTextElement(x: number, y: number): TextElement {
     height: 100,
     rotation: 0,
     zIndex: _elementIdCounter,
+    pageIndex,
     contentHTML: 'New Text',
     defaultFontFamily: getDefaultFontFamily(),
     defaultFontSize: 16,
@@ -32,7 +33,7 @@ export function createDefaultTextElement(x: number, y: number): TextElement {
   };
 }
 
-export function createDefaultImageElement(x: number, y: number): ImageElement {
+export function createDefaultImageElement(x: number, y: number, pageIndex: number): ImageElement {
   return {
     id: generateId(),
     type: 'image',
@@ -42,6 +43,7 @@ export function createDefaultImageElement(x: number, y: number): ImageElement {
     height: 200,
     rotation: 0,
     zIndex: _elementIdCounter,
+    pageIndex,
     src: '',
     objectFit: 'contain',
   };
@@ -106,10 +108,11 @@ export function useDragDrop() {
         canvasBounds,
       );
 
+      const pageIndex = useEditorStore.getState().currentPage;
       if (templateData.type === 'text') {
-        addElement(createDefaultTextElement(clamped.x, clamped.y));
+        addElement(createDefaultTextElement(clamped.x, clamped.y, pageIndex));
       } else if (templateData.type === 'image') {
-        addElement(createDefaultImageElement(clamped.x, clamped.y));
+        addElement(createDefaultImageElement(clamped.x, clamped.y, pageIndex));
       }
     },
     [zoom, addElement],

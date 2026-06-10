@@ -5,7 +5,7 @@ import type { TextElement, ImageElement, CanvasElement } from '../types/elements
 function makeTextEl(overrides: Partial<TextElement> = {}): TextElement {
   return {
     id: 'text-1', type: 'text', x: 100, y: 200, width: 300, height: 100,
-    rotation: 0, zIndex: 1, contentHTML: 'Hello World',
+    rotation: 0, pageIndex: 0, zIndex: 1, contentHTML: 'Hello World',
     defaultFontFamily: 'Inter', defaultFontSize: 16, defaultColor: '#000000',
     defaultFontWeight: 400, defaultFontStyle: 'normal',
     defaultTextAlign: 'left', defaultLineHeight: 1.5,
@@ -16,7 +16,7 @@ function makeTextEl(overrides: Partial<TextElement> = {}): TextElement {
 function makeImageEl(overrides: Partial<ImageElement> = {}): ImageElement {
   return {
     id: 'img-1', type: 'image', x: 50, y: 50, width: 200, height: 200,
-    rotation: 0, zIndex: 1, src: 'data:image/png;base64,abc',
+    rotation: 0, pageIndex: 0, zIndex: 1, src: 'data:image/png;base64,abc',
     objectFit: 'contain', ...overrides,
   };
 }
