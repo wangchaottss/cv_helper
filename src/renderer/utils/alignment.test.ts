@@ -106,6 +106,25 @@ describe('detectAlignments', () => {
     expect(result.snapX).toBe(2);
   });
 
+  it('snaps moving-left to ref-right (adjacent side-by-side)', () => {
+    // moving at x=302, ref at x=0..300, ref.right=300. moving.left=302. dist=2 < 8
+    const moving = getElementRect({ x: 302, y: 100, width: 100, height: 50 });
+    const refs = [getElementRect({ x: 100, y: 100, width: 200, height: 50 })];
+    const result = detectAlignments(moving, refs, CANVAS_BOUNDS);
+    // Should snap moving.left to ref.right
+    expect(result.vertical).toContain(300); // ref.right
+    expect(result.snapX).toBe(-2);
+  });
+
+  it('snaps moving-top to ref-bottom (adjacent stacking)', () => {
+    // moving at y=152, ref at y=0..150, ref.bottom=150. moving.top=152. dist=2 < 8
+    const moving = getElementRect({ x: 100, y: 152, width: 100, height: 50 });
+    const refs = [getElementRect({ x: 100, y: 50, width: 100, height: 100 })];
+    const result = detectAlignments(moving, refs, CANVAS_BOUNDS);
+    expect(result.horizontal).toContain(150); // ref.bottom
+    expect(result.snapY).toBe(-2);
+  });
+
   it('returns no alignment when distance > threshold', () => {
     const moving = getElementRect({ x: 100, y: 100, width: 100, height: 50 });
     const refs = [getElementRect({ x: 300, y: 300, width: 100, height: 50 })];

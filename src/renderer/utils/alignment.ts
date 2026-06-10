@@ -80,20 +80,25 @@ export function detectAlignments(
   // Collect ALL vertical snap candidates (x-axis guides)
   const vCandidates: SnapCandidate[] = [];
   for (const ref of refs) {
-    // Moving left ↔ ref left
-    vCandidates.push({ pos: ref.left, offset: ref.left - movingRect.left, dist: Math.abs(movingRect.left - ref.left) });
-    // Moving right ↔ ref right
-    vCandidates.push({ pos: ref.right, offset: ref.right - movingRect.right, dist: Math.abs(movingRect.right - ref.right) });
-    // Moving centerX ↔ ref centerX
-    vCandidates.push({ pos: ref.centerX, offset: ref.centerX - movingRect.centerX, dist: Math.abs(movingRect.centerX - ref.centerX) });
+    // Same-edge: left↔left, right↔right, center↔center
+    vCandidates.push({ pos: ref.left,    offset: ref.left - movingRect.left,       dist: Math.abs(movingRect.left - ref.left) });
+    vCandidates.push({ pos: ref.right,   offset: ref.right - movingRect.right,      dist: Math.abs(movingRect.right - ref.right) });
+    vCandidates.push({ pos: ref.centerX, offset: ref.centerX - movingRect.centerX,   dist: Math.abs(movingRect.centerX - ref.centerX) });
+    // Cross-edge (adjacent): moving-left↔ref-right, moving-right↔ref-left
+    vCandidates.push({ pos: ref.right,   offset: ref.right - movingRect.left,       dist: Math.abs(movingRect.left - ref.right) });
+    vCandidates.push({ pos: ref.left,    offset: ref.left - movingRect.right,        dist: Math.abs(movingRect.right - ref.left) });
   }
 
   // Collect ALL horizontal snap candidates (y-axis guides)
   const hCandidates: SnapCandidate[] = [];
   for (const ref of refs) {
-    hCandidates.push({ pos: ref.top, offset: ref.top - movingRect.top, dist: Math.abs(movingRect.top - ref.top) });
-    hCandidates.push({ pos: ref.bottom, offset: ref.bottom - movingRect.bottom, dist: Math.abs(movingRect.bottom - ref.bottom) });
-    hCandidates.push({ pos: ref.centerY, offset: ref.centerY - movingRect.centerY, dist: Math.abs(movingRect.centerY - ref.centerY) });
+    // Same-edge: top↔top, bottom↔bottom, center↔center
+    hCandidates.push({ pos: ref.top,    offset: ref.top - movingRect.top,          dist: Math.abs(movingRect.top - ref.top) });
+    hCandidates.push({ pos: ref.bottom, offset: ref.bottom - movingRect.bottom,     dist: Math.abs(movingRect.bottom - ref.bottom) });
+    hCandidates.push({ pos: ref.centerY, offset: ref.centerY - movingRect.centerY,  dist: Math.abs(movingRect.centerY - ref.centerY) });
+    // Cross-edge (adjacent): moving-top↔ref-bottom, moving-bottom↔ref-top
+    hCandidates.push({ pos: ref.bottom, offset: ref.bottom - movingRect.top,       dist: Math.abs(movingRect.top - ref.bottom) });
+    hCandidates.push({ pos: ref.top,    offset: ref.top - movingRect.bottom,        dist: Math.abs(movingRect.bottom - ref.top) });
   }
 
   // Find the single closest snap per axis
