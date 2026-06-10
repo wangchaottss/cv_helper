@@ -63,8 +63,8 @@ export function useElementDrag() {
 
       const alignment = detectAlignments(movingRect, otherRects, canvasBounds);
 
-      // Find snap targets for visual highlight
-      if (alignment.snapX !== null || alignment.snapY !== null) {
+      // Find snap targets for visual highlight (only when snap is enabled)
+      if (currentSnapEnabled && (alignment.snapX !== null || alignment.snapY !== null)) {
         const sx = alignment.snapX ?? 0;
         const sy = alignment.snapY ?? 0;
         const snappedRect = getElementRect({
