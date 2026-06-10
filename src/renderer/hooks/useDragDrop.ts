@@ -2,9 +2,11 @@ import { useCallback, useRef } from 'react';
 import { useEditorStore } from '../store/editorStore';
 import { clientToCanvas, clampToCanvas, getCanvasBounds } from '../utils/coordinates';
 import { getDefaultFontFamily } from '../utils/fontRegistry';
-import type { TextElement, ImageElement } from '../types/elements';
+import type { TextElement, ImageElement, LineElement, BoxElement } from '../types/elements';
 
 let _elementIdCounter = 0;
+let _lineCounter = 0;
+let _boxCounter = 0;
 export function generateId(): string {
   _elementIdCounter += 1;
   return `elem-${Date.now()}-${_elementIdCounter}`;
@@ -30,6 +32,28 @@ export function createDefaultTextElement(x: number, y: number, pageIndex: number
     defaultTextAlign: 'left',
     defaultLineHeight: 1.5,
     defaultBackgroundColor: 'transparent',
+  };
+}
+
+function nextLineName(): string { _lineCounter += 1; return `L${_lineCounter}`; }
+function nextBoxName(): string { _boxCounter += 1; return `B${_boxCounter}`; }
+
+export function createDefaultLine(x: number, y: number, pageIndex: number): LineElement {
+  return {
+    id: generateId(), type: 'line',
+    x1: x, y1: y, x2: x + 100, y2: y,
+    color: '#000000', lineStyle: 'solid', thickness: 2,
+    name: nextLineName(), pageIndex,
+  };
+}
+
+export function createDefaultBox(x: number, y: number, pageIndex: number): BoxElement {
+  return {
+    id: generateId(), type: 'box',
+    x, y, width: 150, height: 100,
+    borderStyle: 'solid', borderColor: '#000000', borderWidth: 2,
+    borderRadius: 0, fillColor: 'transparent',
+    name: nextBoxName(), pageIndex,
   };
 }
 
@@ -113,6 +137,10 @@ export function useDragDrop() {
         addElement(createDefaultTextElement(clamped.x, clamped.y, pageIndex));
       } else if (templateData.type === 'image') {
         addElement(createDefaultImageElement(clamped.x, clamped.y, pageIndex));
+      } else if (templateData.type === 'line') {
+        addElement(createDefaultLine(clamped.x, clamped.y, pageIndex));
+      } else if (templateData.type === 'box') {
+        addElement(createDefaultBox(clamped.x, clamped.y, pageIndex));
       }
     },
     [zoom, addElement],

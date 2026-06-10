@@ -105,18 +105,38 @@ export default function LineRenderer({ element }: { element: LineElement }) {
 
   const dashArray = element.lineStyle === 'dashed' ? `${element.thickness * 4} ${element.thickness * 2}` : element.lineStyle === 'dotted' ? `${element.thickness} ${element.thickness * 2}` : 'none';
 
+  const handleLineClick = useCallback((e: React.PointerEvent) => {
+    e.stopPropagation();
+    const store = useEditorStore.getState();
+    if (e.shiftKey || e.metaKey || e.ctrlKey) {
+      store.toggleSelection(element.id);
+    } else {
+      store.setSelection([element.id]);
+    }
+  }, [element.id]);
+
   return (
     <svg
-      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}
+      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', overflow: 'visible', pointerEvents: 'none' }}
       data-testid={`element-${element.id}`}
     >
+      {/* Invisible wider hit area for easier click selection */}
+      <line
+        x1={element.x1} y1={element.y1} x2={element.x2} y2={element.y2}
+        stroke="transparent"
+        strokeWidth={Math.max(element.thickness, 8)}
+        strokeLinecap="round"
+        style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+        onPointerDown={handleLineClick}
+      />
+      {/* Visible line */}
       <line
         x1={element.x1} y1={element.y1} x2={element.x2} y2={element.y2}
         stroke={element.color}
         strokeWidth={element.thickness}
         strokeDasharray={dashArray}
         strokeLinecap="round"
-        style={{ pointerEvents: 'stroke' }}
+        style={{ pointerEvents: 'none' }}
       />
       {/* Clickable endpoint handles */}
       {isSelected && (
