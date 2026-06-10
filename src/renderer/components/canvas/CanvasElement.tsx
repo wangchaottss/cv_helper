@@ -54,18 +54,29 @@ export default function CanvasElement({ element, isSelected, onPointerDown, onRe
   // Save content before React clears it when entering edit mode
   const savedContentRef = useRef('');
 
-  // Double-click via mouse event
+  // Double-click: edit text or import image
   const handleDoubleClick = useCallback(
-    (e: React.MouseEvent) => {
+    async (e: React.MouseEvent) => {
       e.stopPropagation();
       e.preventDefault();
       if (element.type === 'text') {
-        // Save current content before React removes dangerouslySetInnerHTML
-        savedContentRef.current = elementRef.current?.innerHTML || (element.type === 'text' ? element.contentHTML : '');
+        savedContentRef.current = elementRef.current?.innerHTML || element.contentHTML;
         setIsEditing(true);
+      } else if (element.type === 'image' && window.electronAPI) {
+        // Double-click image → import
+        const filePath = await window.electronAPI.showOpenDialog({
+          filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'] }],
+        });
+        if (filePath) {
+          const dataUrl = await window.electronAPI.readImage(filePath);
+          if (dataUrl) {
+            useEditorStore.getState().updateElement(element.id, { src: dataUrl });
+          }
+        }
       }
     },
-    [element.type, element.type === 'text' ? element.contentHTML : ''],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [element.type, element.id],
   );
 
   // When entering edit mode, React clears the DOM (removes dangerouslySetInnerHTML).

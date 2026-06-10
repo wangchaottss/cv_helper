@@ -15,8 +15,36 @@ export default function ImageProperties({ element, onUpdate, disabled }: ImagePr
     [onUpdate],
   );
 
+  const handleImportImage = useCallback(async () => {
+    if (!window.electronAPI) return;
+
+    const filePath = await window.electronAPI.showOpenDialog({
+      filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'] }],
+    });
+    if (!filePath) return;
+
+    const dataUrl = await window.electronAPI.readImage(filePath);
+    if (dataUrl) {
+      onUpdate({ src: dataUrl });
+    }
+  }, [onUpdate]);
+
   return (
     <div className="space-y-4" data-testid="image-properties">
+      {/* Import Button */}
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={handleImportImage}
+        className={`w-full py-2 text-sm rounded border ${
+          disabled
+            ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+            : 'bg-blue-500 text-white border-blue-500 hover:bg-blue-600'
+        }`}
+      >
+        {element.src ? 'Replace Image' : 'Import Image'}
+      </button>
+
       {/* Image Preview */}
       <div>
         <label className="block text-[11px] font-medium text-gray-500 mb-1 uppercase tracking-wide">

@@ -198,6 +198,19 @@ ipcMain.handle('file:readHtml', async (_event, filePath: string) => {
   return content;
 });
 
+// File read: image → base64 data URL
+ipcMain.handle('file:readImage', async (_event, filePath: string) => {
+  try {
+    const buffer = await readFile(filePath);
+    const ext = filePath.split('.').pop()?.toLowerCase() || 'png';
+    const mime = ext === 'jpg' ? 'jpeg' : ext;
+    return `data:image/${mime};base64,${buffer.toString('base64')}`;
+  } catch (err) {
+    console.error('Failed to read image:', err);
+    return null;
+  }
+});
+
 // Read built-in font file
 ipcMain.handle('font:readBuiltInFont', async (_event, family: string, weight: number) => {
   try {

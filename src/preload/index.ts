@@ -16,6 +16,8 @@ const electronAPI = {
     ipcRenderer.invoke('file:writeHtml', path, html),
   readHtml: (path: string): Promise<string> =>
     ipcRenderer.invoke('file:readHtml', path),
+  readImage: (path: string): Promise<string | null> =>
+    ipcRenderer.invoke('file:readImage', path),
 
   // Font embedding
   readBuiltInFont: (family: string, weight: number): Promise<string | null> =>
