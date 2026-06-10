@@ -158,9 +158,15 @@ export default function CanvasElement({ element, isSelected, onPointerDown, onRe
     touchAction: 'none',
   };
 
+  const snapTargets = useEditorStore((s) => s.snapTargets);
+  const isSnapTarget = snapTargets.includes(element.id);
+
   if (isSelected && !isEditing) {
     baseStyle.outline = '2px solid #2563eb';
     baseStyle.outlineOffset = '0px';
+  } else if (isSnapTarget && !isSelected) {
+    baseStyle.outline = '2px dashed #22c55e';
+    baseStyle.outlineOffset = '2px';
   }
 
   if (element.type === 'text') {

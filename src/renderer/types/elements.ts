@@ -57,6 +57,7 @@ export interface EditorState {
   showGuides: boolean;
   snapEnabled: boolean;
   guideLines: GuideLinesData;
+  snapTargets: string[];
 
   // Actions
   addElement: (element: CanvasElement) => void;
@@ -70,6 +71,7 @@ export interface EditorState {
   toggleSnap: () => void;
   setGuideLines: (lines: GuideLinesData) => void;
   clearGuides: () => void;
+  setSnapTargets: (ids: string[]) => void;
   pushHistory: () => void;
   undo: () => void;
   redo: () => void;

@@ -26,6 +26,7 @@ export const useEditorStore = create<InternalState>((set, get) => ({
   showGuides: true,
   snapEnabled: true,
   guideLines: { horizontal: [], vertical: [] },
+  snapTargets: [],
   _history: [],
   _future: [],
 
@@ -101,6 +102,10 @@ export const useEditorStore = create<InternalState>((set, get) => ({
 
   clearGuides: () => {
     set({ guideLines: { horizontal: [], vertical: [] } });
+  },
+
+  setSnapTargets: (ids: string[]) => {
+    set({ snapTargets: ids });
   },
 
   pushHistory: () => {

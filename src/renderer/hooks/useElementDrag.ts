@@ -56,11 +56,48 @@ export function useElementDrag() {
         width: primaryEl.width, height: primaryEl.height,
       });
 
-      const otherRects = Object.values(store.elements)
-        .filter((el) => !targetIds.includes(el.id))
-        .map((el) => getElementRect(el));
+      const otherElements = Object.values(store.elements).filter(
+        (el) => !targetIds.includes(el.id),
+      );
+      const otherRects = otherElements.map((el) => getElementRect(el));
 
       const alignment = detectAlignments(movingRect, otherRects, canvasBounds);
+
+      // Find snap targets for visual highlight
+      if (alignment.snapX !== null || alignment.snapY !== null) {
+        const sx = alignment.snapX ?? 0;
+        const sy = alignment.snapY ?? 0;
+        const snappedRect = getElementRect({
+          x: newX + sx, y: newY + sy,
+          width: primaryEl.width, height: primaryEl.height,
+        });
+        const targets: string[] = [];
+        for (let i = 0; i < otherElements.length; i++) {
+          const r = otherRects[i];
+          if (
+            Math.abs(snappedRect.left - r.left) < 1 || Math.abs(snappedRect.right - r.right) < 1 ||
+            Math.abs(snappedRect.left - r.right) < 1 || Math.abs(snappedRect.right - r.left) < 1 ||
+            Math.abs(snappedRect.top - r.top) < 1 || Math.abs(snappedRect.bottom - r.bottom) < 1 ||
+            Math.abs(snappedRect.top - r.bottom) < 1 || Math.abs(snappedRect.bottom - r.top) < 1 ||
+            Math.abs(snappedRect.centerX - r.centerX) < 1 || Math.abs(snappedRect.centerY - r.centerY) < 1
+          ) {
+            targets.push(otherElements[i].id);
+          }
+        }
+        // Canvas border/midline
+        const cw = canvasBounds.width;
+        const ch = canvasBounds.height;
+        if (
+          Math.abs(snappedRect.left) < 1 || Math.abs(snappedRect.top) < 1 ||
+          Math.abs(snappedRect.right - cw) < 1 || Math.abs(snappedRect.bottom - ch) < 1 ||
+          Math.abs(snappedRect.centerX - cw / 2) < 1 || Math.abs(snappedRect.centerY - ch / 2) < 1
+        ) {
+          targets.push('__canvas__');
+        }
+        useEditorStore.getState().setSnapTargets(targets);
+      } else {
+        useEditorStore.getState().setSnapTargets([]);
+      }
 
       if (currentShowGuides) {
         useEditorStore.getState().setGuideLines({
@@ -124,6 +161,7 @@ export function useElementDrag() {
     }
 
     useEditorStore.getState().clearGuides();
+    useEditorStore.getState().setSnapTargets([]);
     pendingDelta.current = null;
     dragRef.current = null;
 
