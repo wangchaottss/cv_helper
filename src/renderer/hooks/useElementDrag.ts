@@ -76,11 +76,15 @@ export function useElementDrag() {
       }
     }
 
+    // Use the snap-corrected position to compute the effective delta
+    const effectiveDx = newX - drag.startElementX;
+    const effectiveDy = newY - drag.startElementY;
+
     for (const id of targetIds) {
       const el = store.elements[id];
       if (!el) continue;
-      const elNewX = drag.startElementX + logicalDx + (el.x - primaryEl.x);
-      const elNewY = drag.startElementY + logicalDy + (el.y - primaryEl.y);
+      const elNewX = drag.startElementX + effectiveDx + (el.x - primaryEl.x);
+      const elNewY = drag.startElementY + effectiveDy + (el.y - primaryEl.y);
       const clamped = clampToCanvas(elNewX, elNewY, el.width, el.height, canvasBounds);
       useEditorStore.getState().updateElement(id, { x: clamped.x, y: clamped.y });
     }
