@@ -75,14 +75,13 @@ export function useMarqueeSelect() {
 
     const m = marqueeRef.current;
 
-    // Only select if marquee has meaningful size (> 3px)
+    // Only select if marquee has meaningful size (> 3px), otherwise deselect
     if (m.width > 3 && m.height > 3) {
       const store = useEditorStore.getState();
       const elements = Object.values(store.elements) as CanvasElement[];
       const selected: string[] = [];
 
       for (const el of elements) {
-        // Element must be FULLY inside the marquee (not just intersecting)
         if (
           el.x >= m.x &&
           el.y >= m.y &&
@@ -94,6 +93,9 @@ export function useMarqueeSelect() {
       }
 
       store.setSelection(selected);
+    } else {
+      // Tiny drag or single click on empty space → deselect
+      useEditorStore.getState().setSelection([]);
     }
 
     marqueeRef.current = null;

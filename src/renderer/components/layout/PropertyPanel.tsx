@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import TextProperties from '../properties/TextProperties';
 import ImageProperties from '../properties/ImageProperties';
+import ElementList from '../properties/ElementList';
 import type { TextElement, ImageElement, CanvasElement } from '../../types/elements';
 
 // ============================================================
@@ -160,6 +161,9 @@ export default function PropertyPanel() {
             </div>
           </div>
         )}
+
+        {/* Element List */}
+        <ElementList />
       </div>
     </aside>
   );

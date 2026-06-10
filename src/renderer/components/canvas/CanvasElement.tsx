@@ -152,7 +152,7 @@ export default function CanvasElement({ element, isSelected, onPointerDown, onRe
     top: `${element.y}px`,
     width: `${element.width}px`,
     height: `${element.height}px`,
-    zIndex: element.zIndex + (isSelected ? 1000 : 0),
+    zIndex: element.zIndex,
     boxSizing: 'border-box',
     cursor: isEditing ? 'text' : 'move',
     touchAction: 'none',
