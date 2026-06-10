@@ -105,15 +105,41 @@ export default function LineRenderer({ element }: { element: LineElement }) {
 
   const dashArray = element.lineStyle === 'dashed' ? `${element.thickness * 4} ${element.thickness * 2}` : element.lineStyle === 'dotted' ? `${element.thickness} ${element.thickness * 2}` : 'none';
 
-  const handleLineClick = useCallback((e: React.PointerEvent) => {
+  // Click to select, drag the middle to move whole line
+  const handleLinePointerDown = useCallback((e: React.PointerEvent) => {
     e.stopPropagation();
+    e.preventDefault();
     const store = useEditorStore.getState();
     if (e.shiftKey || e.metaKey || e.ctrlKey) {
       store.toggleSelection(element.id);
     } else {
       store.setSelection([element.id]);
     }
-  }, [element.id]);
+
+    const startX1 = element.x1, startY1 = element.y1;
+    const startX2 = element.x2, startY2 = element.y2;
+    const startMouseX = e.clientX, startMouseY = e.clientY;
+    const zoom = store.zoom;
+
+    const onMove = (me: PointerEvent) => {
+      const dx = Math.round((me.clientX - startMouseX) / zoom);
+      const dy = Math.round((me.clientY - startMouseY) / zoom);
+      const cb = getCanvasBounds();
+      const clampX = (v: number) => Math.max(0, Math.min(cb.width, v));
+      const clampY = (v: number) => Math.max(0, Math.min(cb.height, v));
+      useEditorStore.getState().updateElement(element.id, {
+        x1: clampX(startX1 + dx), y1: clampY(startY1 + dy),
+        x2: clampX(startX2 + dx), y2: clampY(startY2 + dy),
+      });
+    };
+    const onUp = () => {
+      useEditorStore.getState().pushHistory();
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp, { once: true });
+  }, [element.id, element.x1, element.y1, element.x2, element.y2]);
 
   return (
     <svg
@@ -126,8 +152,8 @@ export default function LineRenderer({ element }: { element: LineElement }) {
         stroke="transparent"
         strokeWidth={Math.max(element.thickness, 8)}
         strokeLinecap="round"
-        style={{ pointerEvents: 'auto', cursor: 'pointer' }}
-        onPointerDown={handleLineClick}
+        style={{ pointerEvents: 'auto', cursor: 'move' }}
+        onPointerDown={handleLinePointerDown}
       />
       {/* Visible line */}
       <line
