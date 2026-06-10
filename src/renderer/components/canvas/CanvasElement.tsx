@@ -43,8 +43,8 @@ export default function CanvasElement({ element, isSelected, onPointerDown, onRe
   const composingRef = useRef(false);
   const elementRef = useRef<HTMLDivElement>(null);
 
-  // Guidelines are rendered separately
-  if (element.type === 'guideline') return null;
+  // Guidelines, lines, boxes are rendered separately
+  if (element.type === 'guideline' || element.type === 'line' || element.type === 'box') return null;
 
   // PointerDown: select + start drag
   const handlePointerDown = useCallback(

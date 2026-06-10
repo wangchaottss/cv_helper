@@ -1,277 +1,99 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useEditorStore } from '../store/editorStore';
 import { clampToCanvas, getCanvasBounds } from '../utils/coordinates';
-import { getElementRect } from '../utils/alignment';
 
-const MIN_SIZE = 20; // minimum width/height in px
-
-type ResizeHandle =
-  | 'nw' | 'ne' | 'sw' | 'se'   // corners
-  | 'n'  | 's'  | 'e'  | 'w';  // edges
-
-// Map control point index to resize handle
-const HANDLE_MAP: ResizeHandle[] = [
-  'nw', 'ne', 'sw', 'se',  // corners
-  'n',  'e',  's',  'w',   // edges
-];
+const MIN_SIZE = 20;
+type ResizeHandle = 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w';
+const HANDLE_MAP: ResizeHandle[] = ['nw', 'ne', 'sw', 'se', 'n', 'e', 's', 'w'];
 
 interface ResizeState {
-  elementId: string;
-  handle: ResizeHandle;
-  startMouseX: number;
-  startMouseY: number;
-  startX: number;
-  startY: number;
-  startW: number;
-  startH: number;
+  elementId: string; handle: ResizeHandle;
+  startMouseX: number; startMouseY: number;
+  startX: number; startY: number; startW: number; startH: number;
 }
 
 export function useResize() {
   const resizeRef = useRef<ResizeState | null>(null);
 
   const handleWindowPointerMove = useCallback((e: PointerEvent) => {
-    const rs = resizeRef.current;
-    if (!rs) return;
-
-    const dx = e.clientX - rs.startMouseX;
-    const dy = e.clientY - rs.startMouseY;
-    const store = useEditorStore.getState();
-    const zoom = store.zoom;
-
-    const logicalDx = Math.round(dx / zoom);
-    const logicalDy = Math.round(dy / zoom);
-
-    let newX = rs.startX;
-    let newY = rs.startY;
-    let newW = rs.startW;
-    let newH = rs.startH;
-
+    const rs = resizeRef.current; if (!rs) return;
+    const dx = e.clientX - rs.startMouseX, dy = e.clientY - rs.startMouseY;
+    const store = useEditorStore.getState(), zoom = store.zoom;
+    let newX = rs.startX, newY = rs.startY, newW = rs.startW, newH = rs.startH;
+    const logicalDx = Math.round(dx / zoom), logicalDy = Math.round(dy / zoom);
     switch (rs.handle) {
-      case 'nw':
-        newX = rs.startX + logicalDx;
-        newY = rs.startY + logicalDy;
-        newW = rs.startW - logicalDx;
-        newH = rs.startH - logicalDy;
-        break;
-      case 'ne':
-        newY = rs.startY + logicalDy;
-        newW = rs.startW + logicalDx;
-        newH = rs.startH - logicalDy;
-        break;
-      case 'sw':
-        newX = rs.startX + logicalDx;
-        newW = rs.startW - logicalDx;
-        newH = rs.startH + logicalDy;
-        break;
-      case 'se':
-        newW = rs.startW + logicalDx;
-        newH = rs.startH + logicalDy;
-        break;
-      case 'n':
-        newY = rs.startY + logicalDy;
-        newH = rs.startH - logicalDy;
-        break;
-      case 's':
-        newH = rs.startH + logicalDy;
-        break;
-      case 'e':
-        newW = rs.startW + logicalDx;
-        break;
-      case 'w':
-        newX = rs.startX + logicalDx;
-        newW = rs.startW - logicalDx;
-        break;
+      case 'nw': newX += logicalDx; newY += logicalDy; newW -= logicalDx; newH -= logicalDy; break;
+      case 'ne': newY += logicalDy; newW += logicalDx; newH -= logicalDy; break;
+      case 'sw': newX += logicalDx; newW -= logicalDx; newH += logicalDy; break;
+      case 'se': newW += logicalDx; newH += logicalDy; break;
+      case 'n': newY += logicalDy; newH -= logicalDy; break;
+      case 's': newH += logicalDy; break;
+      case 'e': newW += logicalDx; break;
+      case 'w': newX += logicalDx; newW -= logicalDx; break;
     }
+    if (newW < MIN_SIZE) { if (rs.handle.includes('w')) newX = rs.startX + rs.startW - MIN_SIZE; newW = MIN_SIZE; }
+    if (newH < MIN_SIZE) { if (rs.handle.includes('n')) newY = rs.startY + rs.startH - MIN_SIZE; newH = MIN_SIZE; }
 
-    // Enforce minimum size
-    if (newW < MIN_SIZE) {
-      if (rs.handle.includes('w')) newX = rs.startX + rs.startW - MIN_SIZE;
-      newW = MIN_SIZE;
-    }
-    if (newH < MIN_SIZE) {
-      if (rs.handle.includes('n')) newY = rs.startY + rs.startH - MIN_SIZE;
-      newH = MIN_SIZE;
-    }
-
-    // Edge-specific snapping during resize — only snap the edge(s) being dragged
     const canvasBounds = getCanvasBounds();
     if (store.snapEnabled) {
-      const allOtherEls = Object.values(store.elements).filter((el) => el.id !== rs.elementId);
-      interface RefEdge { edge: 'left' | 'right' | 'centerX' | 'top' | 'bottom' | 'centerY'; pos: number; elId: string }
-      const refEdges: RefEdge[] = allOtherEls.flatMap((el) => {
-        let r: { left: number; right: number; top: number; bottom: number; centerX: number; centerY: number };
+      const allOtherEls = Object.values(store.elements).filter((el: any) => el.id !== rs.elementId);
+      interface RefEdge { edge: string; pos: number; elId: string }
+      const refEdges: RefEdge[] = [];
+      for (const el of allOtherEls) {
         if (el.type === 'guideline') {
-          r = el.orientation === 'horizontal'
-            ? { left: 0, right: canvasBounds.width, top: el.position, bottom: el.position, centerX: canvasBounds.width / 2, centerY: el.position }
-            : { left: el.position, right: el.position, top: 0, bottom: canvasBounds.height, centerX: el.position, centerY: canvasBounds.height / 2 };
-        } else {
-          r = getElementRect(el);
-        }
-        return [
-          { edge: 'left' as const, pos: r.left, elId: el.id },
-          { edge: 'right' as const, pos: r.right, elId: el.id },
-          { edge: 'centerX' as const, pos: r.centerX, elId: el.id },
-          { edge: 'top' as const, pos: r.top, elId: el.id },
-          { edge: 'bottom' as const, pos: r.bottom, elId: el.id },
-          { edge: 'centerY' as const, pos: r.centerY, elId: el.id },
-        ];
-      });
-      // Canvas borders
-      refEdges.push(
-        { edge: 'left', pos: 0, elId: '__canvas__' },
-        { edge: 'right', pos: canvasBounds.width, elId: '__canvas__' },
-        { edge: 'top', pos: 0, elId: '__canvas__' },
-        { edge: 'bottom', pos: canvasBounds.height, elId: '__canvas__' },
-        { edge: 'centerX', pos: canvasBounds.width / 2, elId: '__canvas__' },
-        { edge: 'centerY', pos: canvasBounds.height / 2, elId: '__canvas__' },
-      );
-
-      const SNAP_THRESHOLD = 8;
-      const targets: string[] = [];
-      let appliedSnapX = false;
-      let appliedSnapY = false;
-
-      // Snap left edge (when resizing w, nw, sw)
-      if (rs.handle.includes('w')) {
-        const movingLeft = newX;
-        let best: { offset: number; elId: string } | null = null;
-        for (const r of refEdges) {
-          if (r.edge === 'left' || r.edge === 'right' || r.edge === 'centerX') {
-            const offset = r.pos - movingLeft;
-            const dist = Math.abs(offset);
-            if (dist < SNAP_THRESHOLD && (!best || dist < Math.abs(best.offset))) {
-              best = { offset, elId: r.elId };
-            }
-          }
-        }
-        if (best) {
-          newX += best.offset;
-          newW -= best.offset;
-          targets.push(best.elId);
-          appliedSnapX = true;
+          if (el.orientation === 'horizontal') { refEdges.push({ edge: 'top', pos: el.position, elId: el.id }, { edge: 'bottom', pos: el.position, elId: el.id }, { edge: 'centerY', pos: el.position, elId: el.id }); }
+          else { refEdges.push({ edge: 'left', pos: el.position, elId: el.id }, { edge: 'right', pos: el.position, elId: el.id }, { edge: 'centerX', pos: el.position, elId: el.id }); }
+        } else if (el.type === 'line') {
+          refEdges.push({ edge: 'left', pos: el.x1, elId: el.id }, { edge: 'right', pos: el.x1, elId: el.id }, { edge: 'centerX', pos: el.x1, elId: el.id });
+          refEdges.push({ edge: 'left', pos: el.x2, elId: el.id }, { edge: 'right', pos: el.x2, elId: el.id }, { edge: 'centerX', pos: el.x2, elId: el.id });
+          refEdges.push({ edge: 'top', pos: el.y1, elId: el.id }, { edge: 'bottom', pos: el.y1, elId: el.id }, { edge: 'centerY', pos: el.y1, elId: el.id });
+          refEdges.push({ edge: 'top', pos: el.y2, elId: el.id }, { edge: 'bottom', pos: el.y2, elId: el.id }, { edge: 'centerY', pos: el.y2, elId: el.id });
+        } else if (el.type === 'text' || el.type === 'image' || el.type === 'box') {
+          refEdges.push({ edge: 'left', pos: el.x, elId: el.id }, { edge: 'right', pos: el.x + el.width, elId: el.id }, { edge: 'centerX', pos: el.x + el.width / 2, elId: el.id });
+          refEdges.push({ edge: 'top', pos: el.y, elId: el.id }, { edge: 'bottom', pos: el.y + el.height, elId: el.id }, { edge: 'centerY', pos: el.y + el.height / 2, elId: el.id });
         }
       }
+      refEdges.push({ edge: 'left', pos: 0, elId: '__canvas__' }, { edge: 'right', pos: canvasBounds.width, elId: '__canvas__' }, { edge: 'centerX', pos: canvasBounds.width / 2, elId: '__canvas__' });
+      refEdges.push({ edge: 'top', pos: 0, elId: '__canvas__' }, { edge: 'bottom', pos: canvasBounds.height, elId: '__canvas__' }, { edge: 'centerY', pos: canvasBounds.height / 2, elId: '__canvas__' });
 
-      // Snap right edge (when resizing e, ne, se)
-      if (rs.handle.includes('e') && !appliedSnapX) {
-        const movingRight = newX + newW;
-        let best: { offset: number; elId: string } | null = null;
-        for (const r of refEdges) {
-          if (r.edge === 'left' || r.edge === 'right' || r.edge === 'centerX') {
-            const offset = r.pos - movingRight;
-            const dist = Math.abs(offset);
-            if (dist < SNAP_THRESHOLD && (!best || dist < Math.abs(best.offset))) {
-              best = { offset, elId: r.elId };
-            }
-          }
-        }
-        if (best) {
-          newW += best.offset;
-          targets.push(best.elId);
-        }
-      }
-
-      // Snap top edge (when resizing n, nw, ne)
-      if (rs.handle.includes('n')) {
-        const movingTop = newY;
-        let best: { offset: number; elId: string } | null = null;
-        for (const r of refEdges) {
-          if (r.edge === 'top' || r.edge === 'bottom' || r.edge === 'centerY') {
-            const offset = r.pos - movingTop;
-            const dist = Math.abs(offset);
-            if (dist < SNAP_THRESHOLD && (!best || dist < Math.abs(best.offset))) {
-              best = { offset, elId: r.elId };
-            }
-          }
-        }
-        if (best) {
-          newY += best.offset;
-          newH -= best.offset;
-          targets.push(best.elId);
-          appliedSnapY = true;
-        }
-      }
-
-      // Snap bottom edge (when resizing s, sw, se)
-      if (rs.handle.includes('s') && !appliedSnapY) {
-        const movingBottom = newY + newH;
-        let best: { offset: number; elId: string } | null = null;
-        for (const r of refEdges) {
-          if (r.edge === 'top' || r.edge === 'bottom' || r.edge === 'centerY') {
-            const offset = r.pos - movingBottom;
-            const dist = Math.abs(offset);
-            if (dist < SNAP_THRESHOLD && (!best || dist < Math.abs(best.offset))) {
-              best = { offset, elId: r.elId };
-            }
-          }
-        }
-        if (best) {
-          newH += best.offset;
-          targets.push(best.elId);
-        }
-      }
-
-      // Re-check min size after snap
+      const T = 8; const targets: string[] = []; let aX = false, aY = false;
+      if (rs.handle.includes('w')) { const v = newX; let best: { o: number; id: string } | null = null;
+        for (const r of refEdges) { if (r.edge === 'left' || r.edge === 'right' || r.edge === 'centerX') { const o = r.pos - v; if (Math.abs(o) < T && (!best || Math.abs(o) < Math.abs(best.o))) best = { o, id: r.elId }; } }
+        if (best) { newX += best.o; newW -= best.o; targets.push(best.id); aX = true; } }
+      if (rs.handle.includes('e') && !aX) { const v = newX + newW; let best: { o: number; id: string } | null = null;
+        for (const r of refEdges) { if (r.edge === 'left' || r.edge === 'right' || r.edge === 'centerX') { const o = r.pos - v; if (Math.abs(o) < T && (!best || Math.abs(o) < Math.abs(best.o))) best = { o, id: r.elId }; } }
+        if (best) { newW += best.o; targets.push(best.id); } }
+      if (rs.handle.includes('n')) { const v = newY; let best: { o: number; id: string } | null = null;
+        for (const r of refEdges) { if (r.edge === 'top' || r.edge === 'bottom' || r.edge === 'centerY') { const o = r.pos - v; if (Math.abs(o) < T && (!best || Math.abs(o) < Math.abs(best.o))) best = { o, id: r.elId }; } }
+        if (best) { newY += best.o; newH -= best.o; targets.push(best.id); aY = true; } }
+      if (rs.handle.includes('s') && !aY) { const v = newY + newH; let best: { o: number; id: string } | null = null;
+        for (const r of refEdges) { if (r.edge === 'top' || r.edge === 'bottom' || r.edge === 'centerY') { const o = r.pos - v; if (Math.abs(o) < T && (!best || Math.abs(o) < Math.abs(best.o))) best = { o, id: r.elId }; } }
+        if (best) { newH += best.o; targets.push(best.id); } }
       if (newW < MIN_SIZE) { newW = MIN_SIZE; if (rs.handle.includes('w')) newX = rs.startX + rs.startW - MIN_SIZE; }
       if (newH < MIN_SIZE) { newH = MIN_SIZE; if (rs.handle.includes('n')) newY = rs.startY + rs.startH - MIN_SIZE; }
-
-      if (targets.length > 0) {
-        store.setSnapTargets([...new Set(targets)]);
-      } else {
-        store.setSnapTargets([]);
-      }
+      store.setSnapTargets(targets.length > 0 ? [...new Set(targets)] : []);
     }
     const clamped = clampToCanvas(newX, newY, newW, newH, canvasBounds);
-
-    store.updateElement(rs.elementId, {
-      x: clamped.x,
-      y: clamped.y,
-      width: newW,
-      height: newH,
-    });
+    store.updateElement(rs.elementId, { x: clamped.x, y: clamped.y, width: newW, height: newH });
   }, []);
 
   const handleWindowPointerUp = useCallback((_e: PointerEvent) => {
-    if (resizeRef.current) {
-      useEditorStore.getState().pushHistory();
-    }
-    resizeRef.current = null;
-    useEditorStore.getState().setSnapTargets([]);
+    if (resizeRef.current) useEditorStore.getState().pushHistory();
+    resizeRef.current = null; useEditorStore.getState().setSnapTargets([]);
     window.removeEventListener('pointermove', handleWindowPointerMove);
     window.removeEventListener('pointerup', handleWindowPointerUp);
   }, [handleWindowPointerMove]);
 
-  useEffect(() => {
-    return () => {
-      window.removeEventListener('pointermove', handleWindowPointerMove);
-      window.removeEventListener('pointerup', handleWindowPointerUp);
-    };
+  useEffect(() => { return () => { window.removeEventListener('pointermove', handleWindowPointerMove); window.removeEventListener('pointerup', handleWindowPointerUp); }; }, [handleWindowPointerMove, handleWindowPointerUp]);
+
+  const onResizeStart = useCallback((e: React.PointerEvent, elementId: string, handleIndex: number) => {
+    e.stopPropagation(); e.preventDefault();
+    const el = useEditorStore.getState().elements[elementId];
+    if (!el || el.type === 'guideline' || el.type === 'line') return;
+    resizeRef.current = { elementId, handle: HANDLE_MAP[handleIndex], startMouseX: e.clientX, startMouseY: e.clientY, startX: el.x, startY: el.y, startW: el.width, startH: el.height };
+    window.addEventListener('pointermove', handleWindowPointerMove);
+    window.addEventListener('pointerup', handleWindowPointerUp, { once: true });
   }, [handleWindowPointerMove, handleWindowPointerUp]);
-
-  const onResizeStart = useCallback(
-    (e: React.PointerEvent, elementId: string, handleIndex: number) => {
-      e.stopPropagation();
-      e.preventDefault();
-
-      const element = useEditorStore.getState().elements[elementId];
-      if (!element || element.type === 'guideline') return;
-
-      resizeRef.current = {
-        elementId,
-        handle: HANDLE_MAP[handleIndex],
-        startMouseX: e.clientX,
-        startMouseY: e.clientY,
-        startX: element.x,
-        startY: element.y,
-        startW: element.width,
-        startH: element.height,
-      };
-
-      window.addEventListener('pointermove', handleWindowPointerMove);
-      window.addEventListener('pointerup', handleWindowPointerUp, { once: true });
-    },
-    [handleWindowPointerMove, handleWindowPointerUp],
-  );
 
   return { onResizeStart };
 }

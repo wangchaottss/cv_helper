@@ -3,9 +3,9 @@ import { useEditorStore } from '../../store/editorStore';
 import type { CanvasElement, TextElement, ImageElement } from '../../types/elements';
 
 function getElementLabel(el: CanvasElement): string {
-  if (el.type === 'guideline') {
-    return `${el.name} (${el.orientation === 'horizontal' ? 'H' : 'V'})`;
-  }
+  if (el.type === 'guideline') return `${el.name} (${el.orientation === 'horizontal' ? 'H' : 'V'})`;
+  if (el.type === 'line') return el.name;
+  if (el.type === 'box') return el.name;
   if (el.type === 'text') {
     const text = (el as TextElement).contentHTML.replace(/<[^>]*>/g, '').trim();
     if (!text) return '[Empty text]';
@@ -19,6 +19,8 @@ function getElementLabel(el: CanvasElement): string {
 
 function getElementIcon(el: CanvasElement): string {
   if (el.type === 'guideline') return el.orientation === 'horizontal' ? '━' : '┃';
+  if (el.type === 'line') return '╱';
+  if (el.type === 'box') return '▢';
   return el.type === 'text' ? 'T' : '🖼';
 }
 

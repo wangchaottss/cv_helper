@@ -40,13 +40,43 @@ export interface GuideLineElement {
   id: string;
   type: 'guideline';
   orientation: 'horizontal' | 'vertical';
-  position: number; // logical px — y for horizontal, x for vertical
+  position: number;
   color: string;
-  name: string; // A1, A2, ...
+  name: string;
   pageIndex: number;
 }
 
-export type CanvasElement = TextElement | ImageElement | GuideLineElement;
+export type LineStyle = 'solid' | 'dashed' | 'dotted';
+
+export interface LineElement {
+  id: string;
+  type: 'line';
+  x1: number; y1: number;
+  x2: number; y2: number;
+  color: string;
+  lineStyle: LineStyle;
+  thickness: number; // px
+  name: string; // L1, L2, ...
+  pageIndex: number;
+}
+
+export type BorderStyle = 'solid' | 'dashed' | 'none';
+
+export interface BoxElement {
+  id: string;
+  type: 'box';
+  x: number; y: number;
+  width: number; height: number;
+  borderStyle: BorderStyle;
+  borderColor: string;
+  borderWidth: number;
+  borderRadius: number;
+  fillColor: string;
+  name: string; // B1, B2, ...
+  pageIndex: number;
+}
+
+export type CanvasElement = TextElement | ImageElement | GuideLineElement | LineElement | BoxElement;
 
 export interface SystemFont {
   family: string;

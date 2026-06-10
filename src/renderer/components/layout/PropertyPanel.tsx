@@ -3,6 +3,8 @@ import { useEditorStore } from '../../store/editorStore';
 import TextProperties from '../properties/TextProperties';
 import ImageProperties from '../properties/ImageProperties';
 import GuidelineProperties from '../properties/GuidelineProperties';
+import LineProperties from '../properties/LineProperties';
+import BoxProperties from '../properties/BoxProperties';
 import ElementList from '../properties/ElementList';
 import type { TextElement, ImageElement, CanvasElement } from '../../types/elements';
 
@@ -12,7 +14,7 @@ import type { TextElement, ImageElement, CanvasElement } from '../../types/eleme
 
 // Exclude guidelines from z-order — they don't have zIndex
 function zElements() {
-  return Object.values(useEditorStore.getState().elements).filter((el) => el.type !== 'guideline') as Array<TextElement | ImageElement>;
+  return Object.values(useEditorStore.getState().elements).filter((el: any) => el.type !== 'guideline' && el.type !== 'line' && el.type !== 'box') as Array<TextElement | ImageElement>;
 }
 
 function bringToFront(id: string) {
@@ -30,7 +32,7 @@ function sendToBack(id: string) {
 function bringForward(id: string) {
   const store = useEditorStore.getState();
   const current = store.elements[id];
-  if (!current || current.type === 'guideline') return;
+  if (!current || current.type === 'guideline' || current.type === 'line' || current.type === 'box') return;
   const nextHigher = zElements()
     .filter((el) => el.zIndex > current.zIndex)
     .sort((a, b) => a.zIndex - b.zIndex)[0];
@@ -43,7 +45,7 @@ function bringForward(id: string) {
 function sendBackward(id: string) {
   const store = useEditorStore.getState();
   const current = store.elements[id];
-  if (!current || current.type === 'guideline') return;
+  if (!current || current.type === 'guideline' || current.type === 'line' || current.type === 'box') return;
   const nextLower = zElements()
     .filter((el) => el.zIndex < current.zIndex)
     .sort((a, b) => b.zIndex - a.zIndex)[0];
@@ -122,10 +124,13 @@ export default function PropertyPanel() {
         )}
 
         {selectedElement && selectedElement.type === 'guideline' && (
-          <GuidelineProperties
-            element={selectedElement}
-            onUpdate={handleUpdate}
-          />
+          <GuidelineProperties element={selectedElement} onUpdate={handleUpdate} />
+        )}
+        {selectedElement && selectedElement.type === 'line' && (
+          <LineProperties element={selectedElement} onUpdate={handleUpdate} />
+        )}
+        {selectedElement && selectedElement.type === 'box' && (
+          <BoxProperties element={selectedElement} onUpdate={handleUpdate} />
         )}
 
         {/* Z-order controls (not for guidelines) */}

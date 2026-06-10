@@ -7,6 +7,8 @@ import { useResize } from '../../hooks/useResize';
 import { useMarqueeSelect } from '../../hooks/useMarqueeSelect';
 import CanvasElement from '../canvas/CanvasElement';
 import GuideLineRenderer from '../canvas/GuideLineRenderer';
+import LineRenderer from '../canvas/LineRenderer';
+import BoxRenderer from '../canvas/BoxRenderer';
 import GuideLines from '../canvas/GuideLines';
 import MultiSelectOverlay from '../canvas/MultiSelectOverlay';
 
@@ -93,8 +95,18 @@ export default function Canvas() {
                   <GuideLineRenderer key={el.id} element={el} />
                 ))}
 
+              {/* Lines & boxes — rendered below guidelines but above text/image */}
               {elementList
-                .filter((el) => el.type !== 'guideline')
+                .filter((el) => el.type === 'line')
+                .map((el) => (<LineRenderer key={el.id} element={el} />))}
+              {elementList
+                .filter((el) => el.type === 'box')
+                .map((el) => (
+                  <BoxRenderer key={el.id} element={el} isSelected={selection.includes(el.id)} onPointerDown={onPointerDown} onResizeStart={onResizeStart} />
+                ))}
+
+              {elementList
+                .filter((el) => el.type !== 'guideline' && el.type !== 'line' && el.type !== 'box')
                 .map((el) => (
                   <CanvasElement
                     key={el.id}

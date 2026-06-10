@@ -1,12 +1,25 @@
 import React, { useCallback } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { getCanvasBounds } from '../../utils/coordinates';
-import type { GuideLineElement } from '../../types/elements';
+import type { GuideLineElement, LineElement, BoxElement } from '../../types/elements';
 
 let _guideCounter = 0;
-function nextGuideName(): string {
-  _guideCounter += 1;
-  return `A${_guideCounter}`;
+function nextGuideName(): string { _guideCounter += 1; return `A${_guideCounter}`; }
+
+let _lineCounter = 0;
+function nextLineName(): string { _lineCounter += 1; return `L${_lineCounter}`; }
+
+let _boxCounter = 0;
+function nextBoxName(): string { _boxCounter += 1; return `B${_boxCounter}`; }
+
+function createDefaultLine(pageIndex: number): LineElement {
+  const c = getCanvasBounds();
+  return { id: `ln-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, type: 'line', x1: c.width/2-50, y1: c.height/2, x2: c.width/2+50, y2: c.height/2, color: '#3b82f6', lineStyle: 'solid', thickness: 2, name: nextLineName(), pageIndex };
+}
+
+function createDefaultBox(pageIndex: number): BoxElement {
+  const c = getCanvasBounds();
+  return { id: `bx-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, type: 'box', x: c.width/2-75, y: c.height/2-50, width: 150, height: 100, borderStyle: 'solid', borderColor: '#3b82f6', borderWidth: 2, borderRadius: 0, fillColor: 'transparent', name: nextBoxName(), pageIndex };
 }
 
 function createGuideLine(pageIndex: number): GuideLineElement {
@@ -51,10 +64,9 @@ export default function TemplatePanel() {
     [],
   );
 
-  const handleAddGuideLine = useCallback(() => {
-    const gl = createGuideLine(currentPage);
-    addElement(gl);
-  }, [currentPage, addElement]);
+  const handleAddGuideLine = useCallback(() => { addElement(createGuideLine(currentPage)); }, [currentPage, addElement]);
+  const handleAddLine = useCallback(() => { addElement(createDefaultLine(currentPage)); }, [currentPage, addElement]);
+  const handleAddBox = useCallback(() => { addElement(createDefaultBox(currentPage)); }, [currentPage, addElement]);
 
   return (
     <aside className="w-60 bg-white border-r border-gray-300 flex flex-col flex-shrink-0">
@@ -89,6 +101,16 @@ export default function TemplatePanel() {
               ─
             </span>
             <span className="text-sm font-medium text-gray-700">Add Guide Line</span>
+          </button>
+          <button onClick={handleAddLine} className="w-full flex items-center gap-3 p-3 bg-gray-50 border border-dashed border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-colors text-left mt-1"
+            data-testid="template-line">
+            <span className="text-lg w-8 h-8 flex items-center justify-center bg-white rounded border border-gray-300 text-blue-500">╱</span>
+            <span className="text-sm font-medium text-gray-700">Add Line</span>
+          </button>
+          <button onClick={handleAddBox} className="w-full flex items-center gap-3 p-3 bg-gray-50 border border-dashed border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-colors text-left mt-1"
+            data-testid="template-box">
+            <span className="text-lg w-8 h-8 flex items-center justify-center bg-white rounded border border-gray-300 text-blue-500">▢</span>
+            <span className="text-sm font-medium text-gray-700">Add Box</span>
           </button>
         </div>
       </div>

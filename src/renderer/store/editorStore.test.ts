@@ -85,7 +85,7 @@ describe('editorStore', () => {
       useEditorStore.getState().updateElement('text-1', { x: 150, y: 250 });
 
       const state = useEditorStore.getState();
-      const el = state.elements['text-1']; if (el.type !== 'guideline') expect(el.x).toBe(150);
+      const el = state.elements['text-1'] as any; if (el.type !== 'guideline') expect(el.x).toBe(150);
       if (el.type !== 'guideline') expect(el.y).toBe(250);
       // Other props unchanged
       if (el.type !== 'guideline') expect(el.width).toBe(300);

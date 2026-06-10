@@ -80,14 +80,14 @@ export function useKeyboard() {
         if (!el) continue;
 
         if (el.type === 'guideline') {
-          // Guidelines: move only along their perpendicular axis
           if (el.orientation === 'horizontal') {
-            const newPos = Math.max(0, Math.min(canvasBounds.height, el.position + dy));
-            updateElement(id, { position: newPos });
+            updateElement(id, { position: Math.max(0, Math.min(canvasBounds.height, el.position + dy)) });
           } else {
-            const newPos = Math.max(0, Math.min(canvasBounds.width, el.position + dx));
-            updateElement(id, { position: newPos });
+            updateElement(id, { position: Math.max(0, Math.min(canvasBounds.width, el.position + dx)) });
           }
+        } else if (el.type === 'line') {
+          // Line: arrow keys move both endpoints
+          updateElement(id, { x1: el.x1 + dx, y1: el.y1 + dy, x2: el.x2 + dx, y2: el.y2 + dy });
         } else {
           const newX = el.x + dx;
           const newY = el.y + dy;

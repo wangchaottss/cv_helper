@@ -82,7 +82,7 @@ export function useMarqueeSelect() {
       const selected: string[] = [];
 
       for (const el of elements) {
-        if (el.type === 'guideline') continue; // guidelines don't have x/y/width/height
+        if (el.type === 'guideline' || el.type === 'line') continue; // guidelines don't have x/y/width/height
         if (
           el.x >= m.x &&
           el.y >= m.y &&

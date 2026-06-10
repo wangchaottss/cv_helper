@@ -63,8 +63,8 @@ describe('deserializeFromHTML', () => {
 
     expect(result).not.toBeNull();
     expect(result!.elements).toHaveLength(1);
-    expect(result!.elements[0].id).toBe('t1');
-    expect((result!.elements[0] as TextElement).contentHTML).toBe('Round trip test');
+    expect(((result!.elements[0] as any) as any).id).toBe('t1');
+    expect((((result!.elements[0] as any) as any) as TextElement).contentHTML).toBe('Round trip test');
   });
 
   it('returns null for invalid HTML', () => {
@@ -76,7 +76,7 @@ describe('deserializeFromHTML', () => {
     const elements = [makeTextEl({ id: 'pos-test', x: 300, y: 400 })];
     const html = serializeToHTML(elements, { version: '0.1.0', timestamp: 1, zoom: 1 });
     const result = deserializeFromHTML(html);
-    const r0 = result!.elements[0]; if (r0.type !== 'guideline') expect(r0.x).toBe(300);
-    if (r0.type !== 'guideline') expect(r0.y).toBe(400);
+    const r0 = ((result!.elements[0] as any) as any); if (r0.type !== 'guideline') expect(r0.x).toBe(300);
+    if (r0.type !== 'line') expect(r0.y).toBe(400);
   });
 });
