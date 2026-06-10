@@ -153,16 +153,20 @@ export function useElementDrag() {
 
       e.preventDefault();
 
-      const element = useEditorStore.getState().elements[elementId];
+      const store = useEditorStore.getState();
+      const element = store.elements[elementId];
       if (!element) return;
 
       const isMultiSelect = e.shiftKey || e.metaKey || e.ctrlKey;
+      const alreadySelected = store.selection.includes(elementId);
 
       if (isMultiSelect) {
-        useEditorStore.getState().toggleSelection(elementId);
-      } else {
-        useEditorStore.getState().setSelection([elementId]);
+        store.toggleSelection(elementId);
+      } else if (!alreadySelected) {
+        // Click on unselected element — select only this one
+        store.setSelection([elementId]);
       }
+      // If already selected and not multi-select: keep existing selection for drag
 
       // Initialize drag state
       dragRef.current = {

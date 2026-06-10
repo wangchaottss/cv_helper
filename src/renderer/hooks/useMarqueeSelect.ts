@@ -16,35 +16,25 @@ export function useMarqueeSelect() {
 
   const onCanvasMouseDown = useCallback(
     (e: React.MouseEvent, canvasInnerEl: HTMLElement | null) => {
-      // Only start marquee if clicking on empty canvas background
+      // Only start marquee on empty canvas, not on elements
       const target = e.target as HTMLElement;
-      if (
-        target !== canvasInnerEl &&
-        target.dataset['canvasInner'] !== 'true' &&
-        !target.closest('[data-canvas-inner]')
-      ) {
-        return;
-      }
+      if (target.closest('[data-testid^="element-"]')) return;
 
       if (!canvasInnerEl) return;
 
-      const rect = canvasInnerEl.getBoundingClientRect();
-      startMouseRef.current = { x: e.clientX, y: e.clientY };
+      e.preventDefault(); // prevent text selection / scrolling during drag
 
       const store = useEditorStore.getState();
       const zoom = store.zoom;
+      const rect = canvasInnerEl.getBoundingClientRect();
 
-      // Convert client coords to canvas logical coords
+      // Convert viewport coords → A4 logical coords
       const logicalX = (e.clientX - rect.left) / zoom;
       const logicalY = (e.clientY - rect.top) / zoom;
 
-      marqueeRef.current = {
-        x: logicalX,
-        y: logicalY,
-        width: 0,
-        height: 0,
-      };
+      startMouseRef.current = { x: e.clientX, y: e.clientY };
 
+      marqueeRef.current = { x: logicalX, y: logicalY, width: 0, height: 0 };
       setMarquee({ x: logicalX, y: logicalY, width: 0, height: 0 });
     },
     [],
@@ -52,27 +42,30 @@ export function useMarqueeSelect() {
 
   const onCanvasMouseMove = useCallback(
     (e: React.MouseEvent, canvasInnerEl: HTMLElement | null) => {
-      if (!marqueeRef.current || !startMouseRef.current || !canvasInnerEl) return;
+      if (!marqueeRef.current || !canvasInnerEl) return;
+
+      e.preventDefault();
 
       const store = useEditorStore.getState();
       const zoom = store.zoom;
       const rect = canvasInnerEl.getBoundingClientRect();
 
-      const currentLogicalX = (e.clientX - rect.left) / zoom;
-      const currentLogicalY = (e.clientY - rect.top) / zoom;
+      const currentX = (e.clientX - rect.left) / zoom;
+      const currentY = (e.clientY - rect.top) / zoom;
 
-      const startX = marqueeRef.current.x;
-      const startY = marqueeRef.current.y;
+      const originX = marqueeRef.current.x;
+      const originY = marqueeRef.current.y;
 
-      const newMarquee: MarqueeRect = {
-        x: Math.min(startX, currentLogicalX),
-        y: Math.min(startY, currentLogicalY),
-        width: Math.abs(currentLogicalX - startX),
-        height: Math.abs(currentLogicalY - startY),
+      // Build rect that works regardless of drag direction
+      const m = {
+        x: Math.min(originX, currentX),
+        y: Math.min(originY, currentY),
+        width: Math.abs(currentX - originX),
+        height: Math.abs(currentY - originY),
       };
 
-      marqueeRef.current = newMarquee;
-      setMarquee({ ...newMarquee });
+      marqueeRef.current = m;
+      setMarquee({ ...m });
     },
     [],
   );
