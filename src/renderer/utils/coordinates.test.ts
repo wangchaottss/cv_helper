@@ -76,29 +76,23 @@ describe('clampToCanvas', () => {
     expect(result.y).toBe(200);
   });
 
-  it('clamps x so at least 20% is visible', () => {
-    const result = clampToCanvas(-100, 200, 100, 50, bounds);
-    // -elementWidth + minVisibleW = -100 + 20 = -80
-    expect(result.x).toBe(-80);
-    expect(result.y).toBe(200);
+  it('clamps x to 0 when negative', () => {
+    const result = clampToCanvas(-50, 200, 100, 50, bounds);
+    expect(result.x).toBe(0);
   });
 
-  it('clamps y so at least 20% is visible', () => {
-    // y=-90 means only 10% visible (10px of 100), needs clamp to -80
-    const result = clampToCanvas(100, -90, 100, 100, bounds);
-    // -elementHeight + minVisibleH = -100 + 20 = -80
-    expect(result.y).toBe(-80);
+  it('clamps y to 0 when negative', () => {
+    const result = clampToCanvas(100, -30, 100, 100, bounds);
+    expect(result.y).toBe(0);
   });
 
-  it('clamps x to right edge', () => {
+  it('clamps x to canvas right edge', () => {
     const result = clampToCanvas(800, 200, 100, 50, bounds);
-    // canvasBounds.width - minVisibleW = 794 - 20 = 774
-    expect(result.x).toBe(774);
+    expect(result.x).toBe(694); // 794 - 100
   });
 
-  it('clamps y to bottom edge', () => {
+  it('clamps y to canvas bottom edge', () => {
     const result = clampToCanvas(100, 1200, 100, 100, bounds);
-    // canvasBounds.height - minVisibleH = 1123 - 20 = 1103
-    expect(result.y).toBe(1103);
+    expect(result.y).toBe(1023); // 1123 - 100
   });
 });

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useEditorStore } from '../store/editorStore';
+import { clampToCanvas, getCanvasBounds } from '../utils/coordinates';
 
 const MIN_SIZE = 20; // minimum width/height in px
 
@@ -91,9 +92,13 @@ export function useResize() {
       newH = MIN_SIZE;
     }
 
+    // Clamp to canvas bounds
+    const canvasBounds = getCanvasBounds();
+    const clamped = clampToCanvas(newX, newY, newW, newH, canvasBounds);
+
     store.updateElement(rs.elementId, {
-      x: newX,
-      y: newY,
+      x: clamped.x,
+      y: clamped.y,
       width: newW,
       height: newH,
     });

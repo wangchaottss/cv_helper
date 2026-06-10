@@ -46,7 +46,8 @@ export function canvasToClient(
 }
 
 /**
- * Clamp element position so at least 20% is visible within canvas bounds
+ * Clamp element position so it stays fully inside the A4 canvas bounds.
+ * No part of the element is allowed outside.
  */
 export function clampToCanvas(
   x: number,
@@ -55,12 +56,8 @@ export function clampToCanvas(
   elementHeight: number,
   canvasBounds: CanvasBounds,
 ): { x: number; y: number } {
-  const minVisibleRatio = 0.2;
-  const minVisibleW = elementWidth * minVisibleRatio;
-  const minVisibleH = elementHeight * minVisibleRatio;
-
   return {
-    x: Math.max(-elementWidth + minVisibleW, Math.min(x, canvasBounds.width - minVisibleW)),
-    y: Math.max(-elementHeight + minVisibleH, Math.min(y, canvasBounds.height - minVisibleH)),
+    x: Math.max(0, Math.min(x, canvasBounds.width - elementWidth)),
+    y: Math.max(0, Math.min(y, canvasBounds.height - elementHeight)),
   };
 }
