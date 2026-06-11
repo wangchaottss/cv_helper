@@ -272,6 +272,49 @@ export function useCopyPaste() {
     };
   }, [handleCopy, doPaste]);
 
+  // ---------- Keyboard shortcuts (Cmd+C / Cmd+V) ----------
+  // Handled here (not via menu accelerator) so we can check contentEditable state.
+  // If the user is editing text in a contentEditable, let the browser handle
+  // copy/paste natively (pasting text into the element, not creating a new one).
+  useEffect(() => {
+    const onKey = async (e: KeyboardEvent) => {
+      const isMeta = e.metaKey || e.ctrlKey;
+      if (!isMeta) return;
+
+      const active = document.activeElement as HTMLElement | null;
+      const inEditable =
+        active &&
+        (active.tagName === 'INPUT' ||
+          active.tagName === 'TEXTAREA' ||
+          active.isContentEditable);
+
+      // Cmd+C: copy selected elements (only when NOT in an editable field
+      // with text selected — in that case browser handles text copy)
+      if (e.key === 'c' && !e.shiftKey) {
+        if (inEditable && active!.isContentEditable) {
+          const sel = window.getSelection();
+          if (sel && !sel.isCollapsed) return; // text selected → browser handles
+        }
+        if (active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA') return;
+        e.preventDefault();
+        handleCopy();
+        return;
+      }
+
+      // Cmd+V: paste from clipboard (only when NOT in editable field)
+      if (e.key === 'v' && !e.shiftKey) {
+        if (inEditable) return; // browser handles paste into input/textarea/contentEditable
+        e.preventDefault();
+        const cx = _lastMouseClientX;
+        const cy = _lastMouseClientY;
+        await doPaste(cx, cy);
+      }
+    };
+
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [handleCopy, doPaste]);
+
   // ---------- Context menu ----------
   const showContextMenu = useCallback(
     (e: React.MouseEvent) => {
