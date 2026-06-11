@@ -105,7 +105,8 @@ function TextElementView({ element, isSelected, isEditing, onPointerDown, onResi
       editor.commands.setContent(element.contentHTML);
       setTimeout(() => editor.commands.focus('end'), 50);
     } else if (!isEditing && wasEditing) {
-      // Exiting edit mode: flush content to store
+      // Exiting edit mode: blur to clear selection, then flush content
+      editor.commands.blur();
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
         debounceRef.current = null;
