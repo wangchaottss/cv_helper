@@ -274,13 +274,27 @@ export function useCopyPaste() {
     const isEditing = t.isContentEditable || !!t.closest('[contenteditable="true"]');
     console.warn('[ctxmenu] isEditing:', isEditing, 'hasSel:', st.selection.length > 0);
 
-    // Save cursor range before menu steals focus
+    // Save cursor range at exact right-click position
     _savedRange = null;
     if (isEditing) {
-      const sel = window.getSelection();
-      if (sel?.rangeCount) {
-        _savedRange = sel.getRangeAt(0).cloneRange();
-        console.warn('[ctxmenu] saved range for paste');
+      // Use caretPositionFromPoint to get the exact text position under the cursor
+      // This is more reliable than window.getSelection() which may not update
+      // on right-click before the contextmenu event fires
+      const caretPos = (document as any).caretPositionFromPoint?.(e.clientX, e.clientY) as
+        { offsetNode: Node; offset: number } | null;
+      if (caretPos) {
+        const r = document.createRange();
+        r.setStart(caretPos.offsetNode, caretPos.offset);
+        r.collapse(true);
+        _savedRange = r;
+        console.warn('[ctxmenu] saved range via caretPositionFromPoint, offset:', caretPos.offset);
+      } else {
+        // Fallback: use current selection
+        const sel = window.getSelection();
+        if (sel?.rangeCount) {
+          _savedRange = sel.getRangeAt(0).cloneRange();
+          console.warn('[ctxmenu] saved range via getSelection (fallback)');
+        }
       }
     }
 
