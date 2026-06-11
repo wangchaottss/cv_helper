@@ -333,6 +333,10 @@ export function useCopyPaste() {
         }
       }
 
+      // Check if right-click is inside a contentEditable (editing text)
+      const isEditing = target.isContentEditable ||
+        target.closest('[contenteditable="true"]') !== null;
+
       const items: ContextMenuItem[] = [];
 
       if (hasSel || wrapper) {
@@ -342,10 +346,36 @@ export function useCopyPaste() {
         });
       }
 
-      items.push({
-        label: 'Paste', shortcut: '⌘V',
-        action: () => doPaste(e.clientX, e.clientY),
-      });
+      if (isEditing) {
+        // Paste text into contentEditable at cursor position
+        items.push({
+          label: 'Paste', shortcut: '⌘V',
+          action: async () => {
+            const text = await readSystemClipboardText();
+            if (text) {
+              const sel = window.getSelection();
+              if (sel && sel.rangeCount > 0) {
+                const range = sel.getRangeAt(0);
+                range.deleteContents();
+                range.insertNode(document.createTextNode(text));
+                range.collapse(false);
+                sel.removeAllRanges();
+                sel.addRange(range);
+                // Fire input event so the store syncs up
+                (sel.anchorNode?.parentElement || document.activeElement)?.dispatchEvent(
+                  new Event('input', { bubbles: true }),
+                );
+              }
+            }
+          },
+        });
+      } else {
+        // Paste as new element at mouse position
+        items.push({
+          label: 'Paste', shortcut: '⌘V',
+          action: () => doPaste(e.clientX, e.clientY),
+        });
+      }
 
       setContextMenu({ x: e.clientX, y: e.clientY, items });
     },

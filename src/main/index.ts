@@ -83,15 +83,6 @@ function buildMenu() {
         { type: 'separator' },
         { label: 'Delete', accelerator: 'Backspace', click: () => mainWindow?.webContents.send('menu-delete') },
         { type: 'separator' },
-        {
-          label: 'Copy',
-          click: () => mainWindow?.webContents.send('menu-copy'),
-        },
-        {
-          label: 'Paste',
-          click: () => mainWindow?.webContents.send('menu-paste'),
-        },
-        { type: 'separator' },
         { role: 'selectAll' },
       ],
     },
