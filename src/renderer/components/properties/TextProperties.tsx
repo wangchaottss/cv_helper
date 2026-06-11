@@ -4,51 +4,13 @@ import { detectMixedFonts, applyFormat } from '../../utils/richText';
 import { useEditorStore } from '../../store/editorStore';
 import FontSelector from './FontSelector';
 
-// Track the last non-collapsed selection inside any contentEditable.
-// Survives focus changes (e.g. clicking PropertyPanel).
-let _lastInlineSelection: { elementId: string; range: Range } | null = null;
-
-function trackContentEditableSelection(): void {
-  const sel = window.getSelection();
-  if (!sel || sel.isCollapsed || !sel.rangeCount) {
-    // Don't clear _lastInlineSelection — keep it until a new one is set
-    return;
-  }
-  const node = sel.anchorNode;
-  if (!node) return;
-  const ceEl = (node as HTMLElement).closest?.('[contenteditable="true"]') as HTMLElement | null
-    || (node.parentElement?.closest('[contenteditable="true"]') as HTMLElement | null);
-  if (!ceEl) return;
-  const wrapper = ceEl.closest('[data-testid^="element-"]') as HTMLElement | null;
-  if (!wrapper) return;
-  const id = (wrapper.dataset.testid || '').replace('element-', '');
-  _lastInlineSelection = { elementId: id, range: sel.getRangeAt(0).cloneRange() };
-}
-
-// Start tracking on module load
-if (typeof document !== 'undefined') {
-  document.addEventListener('selectionchange', trackContentEditableSelection);
-}
-
 function hasTextSelection(elementId: string): boolean {
-  // First check live selection
   const sel = window.getSelection();
-  if (sel && !sel.isCollapsed && sel.rangeCount) {
-    const node = sel.anchorNode;
-    if (node) {
-      const ceEl = (node as HTMLElement).closest?.('[contenteditable="true"]') as HTMLElement | null
-        || (node.parentElement?.closest('[contenteditable="true"]') as HTMLElement | null);
-      if (ceEl) {
-        const wrapper = ceEl.closest('[data-testid^="element-"]') as HTMLElement | null;
-        if (wrapper) {
-          const id = (wrapper.dataset.testid || '').replace('element-', '');
-          if (id === elementId) return true;
-        }
-      }
-    }
-  }
-  // Fallback to saved selection (e.g. after clicking PropertyPanel)
-  return _lastInlineSelection?.elementId === elementId || false;
+  if (!sel || sel.isCollapsed) return false;
+  const node = sel.anchorNode;
+  if (!node) return false;
+  const wrapper = (node.parentElement || (node as Element).closest?.('*'))?.closest?.('[data-testid^="element-"]') as HTMLElement | null;
+  return wrapper ? (wrapper.dataset.testid || '').replace('element-', '') === elementId : false;
 }
 
 function syncContentAfterFormat(elementId: string): void {
@@ -88,16 +50,7 @@ export default function TextProperties({ element, onUpdate, disabled }: TextProp
   const handleInlineFormat = useCallback(
     (cssProp: string, cssValue: string) => {
       if (hasTextSelection(element.id)) {
-        // Restore saved range if live selection was lost (e.g. clicked PropertyPanel)
-        const sel = window.getSelection();
-        const liveSel = sel && !sel.isCollapsed && sel.rangeCount;
-        if (!liveSel && _lastInlineSelection && _lastInlineSelection.elementId === element.id) {
-          sel?.removeAllRanges();
-          sel?.addRange(_lastInlineSelection.range);
-        }
         applyFormat(cssProp, cssValue);
-        // Update saved range to new selection (inside the new span)
-        trackContentEditableSelection();
         syncContentAfterFormat(element.id);
       } else {
         const field = CSS_TO_ELEMENT[cssProp] as keyof TextElement;

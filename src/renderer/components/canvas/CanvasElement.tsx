@@ -154,9 +154,11 @@ export default function CanvasElement({ element, isSelected, onPointerDown, onRe
     [element.id, updateElement],
   );
 
-  // Flush on blur immediately
+  // Flush content on blur but don't exit edit mode.
+  // Exit only via useEffect when element is deselected.
+  // Keeping contentEditable active preserves the DOM and selection,
+  // which is needed for inline formatting via PropertyPanel.
   const handleBlur = useCallback(() => {
-    setIsEditing(false);
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
       debounceRef.current = null;
