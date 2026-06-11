@@ -29,7 +29,7 @@ const electronAPI = {
 
   // Menu event listeners
   onMenuCommand: (callback: (command: string) => void): (() => void) => {
-    const commands = ['menu-save', 'menu-open', 'menu-export-pdf', 'menu-undo', 'menu-redo', 'menu-delete', 'menu-new'];
+    const commands = ['menu-save', 'menu-open', 'menu-export-pdf', 'menu-undo', 'menu-redo', 'menu-delete', 'menu-new', 'menu-copy', 'menu-paste'];
     const handlers = commands.map((cmd) => {
       const handler = () => callback(cmd);
       ipcRenderer.on(cmd, handler);

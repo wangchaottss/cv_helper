@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { useEditorStore } from '../../store/editorStore';
 import type { CanvasElement as CanvasElementType } from '../../types/elements';
 import FormatToolbar from './FormatToolbar';
+import { handleListKeyDown } from '../../utils/listHandler';
 
 interface CanvasElementProps {
   element: CanvasElementType;
@@ -137,6 +138,22 @@ export default function CanvasElement({ element, isSelected, onPointerDown, onRe
     }, 300);
   }, [element.id, updateElement]);
 
+  // Handle list-related keydown events (Tab indent, Backspace outdent)
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (handleListKeyDown(e)) {
+        e.preventDefault();
+        e.stopPropagation();
+        // After list structure change, sync contentHTML
+        if (elementRef.current) {
+          if (debounceRef.current) clearTimeout(debounceRef.current);
+          updateElement(element.id, { contentHTML: elementRef.current.innerHTML });
+        }
+      }
+    },
+    [element.id, updateElement],
+  );
+
   // Flush on blur immediately
   const handleBlur = useCallback(() => {
     setIsEditing(false);
@@ -214,6 +231,7 @@ export default function CanvasElement({ element, isSelected, onPointerDown, onRe
           }}
           onPointerDown={handlePointerDown}
           onDoubleClick={handleDoubleClick}
+          onKeyDown={handleKeyDown}
           onInput={handleInput}
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}

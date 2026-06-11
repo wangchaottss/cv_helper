@@ -2,6 +2,7 @@ import React, { useEffect, useCallback } from 'react';
 import AppLayout from './components/layout/AppLayout';
 import { registerBuiltInFonts } from './utils/fontRegistry';
 import { useKeyboard } from './hooks/useKeyboard';
+import { triggerGlobalCopy, triggerGlobalPaste } from './hooks/useCopyPaste';
 import { useEditorStore } from './store/editorStore';
 import { serializeToHTML, deserializeFromHTML } from './utils/serialization';
 import { detectUsedFonts, generateFontEmbedCSS } from './utils/fontUsage';
@@ -126,6 +127,12 @@ export default function App() {
         }
         case 'menu-export-pdf':
           handleExportPDF();
+          break;
+        case 'menu-copy':
+          triggerGlobalCopy();
+          break;
+        case 'menu-paste':
+          triggerGlobalPaste();
           break;
       }
     });

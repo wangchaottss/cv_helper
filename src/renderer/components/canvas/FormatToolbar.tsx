@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { applyFormat, removeFormat, getActiveFormats } from '../../utils/richText';
+import { toggleBulletList, toggleOrderedList, isInBulletList, isInOrderedList } from '../../utils/listHandler';
 
 interface FormatToolbarProps {
   visible: boolean;
@@ -7,12 +8,16 @@ interface FormatToolbarProps {
 
 export default function FormatToolbar({ visible }: FormatToolbarProps) {
   const [activeFormats, setActiveFormats] = useState(getActiveFormats());
+  const [inBulletList, setInBulletList] = useState(false);
+  const [inOrderedList, setInOrderedList] = useState(false);
 
-  // Update active formats on selection change
+  // Update active formats and list state on selection change
   useEffect(() => {
     if (!visible) return;
     const handler = () => {
       setActiveFormats(getActiveFormats());
+      setInBulletList(isInBulletList());
+      setInOrderedList(isInOrderedList());
     };
     document.addEventListener('selectionchange', handler);
     return () => document.removeEventListener('selectionchange', handler);
@@ -31,6 +36,24 @@ export default function FormatToolbar({ visible }: FormatToolbarProps) {
   const handleUnderline = useCallback(() => {
     const current = getActiveFormats();
     applyFormat('text-decoration', current.textDecoration?.includes('underline') ? 'none' : 'underline');
+  }, []);
+
+  const handleBulletList = useCallback(() => {
+    toggleBulletList();
+    // Refresh list state immediately
+    setTimeout(() => {
+      setInBulletList(isInBulletList());
+      setInOrderedList(isInOrderedList());
+    }, 0);
+  }, []);
+
+  const handleOrderedList = useCallback(() => {
+    toggleOrderedList();
+    // Refresh list state immediately
+    setTimeout(() => {
+      setInBulletList(isInBulletList());
+      setInOrderedList(isInOrderedList());
+    }, 0);
   }, []);
 
   const handleClearFormat = useCallback(() => {
@@ -64,6 +87,13 @@ export default function FormatToolbar({ visible }: FormatToolbarProps) {
       </ToolbarButton>
       <ToolbarButton active={isUnderline} onClick={handleUnderline} title="Underline">
         <u>U</u>
+      </ToolbarButton>
+      <div className="w-px h-5 bg-gray-200 mx-1" />
+      <ToolbarButton active={inBulletList} onClick={handleBulletList} title="Bullet list">
+        <span className="text-sm leading-none">•</span>
+      </ToolbarButton>
+      <ToolbarButton active={inOrderedList} onClick={handleOrderedList} title="Numbered list">
+        <span className="text-xs leading-none font-medium">1.</span>
       </ToolbarButton>
       <div className="w-px h-5 bg-gray-200 mx-1" />
       <ToolbarButton active={false} onClick={handleClearFormat} title="Clear formatting">

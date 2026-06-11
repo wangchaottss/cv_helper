@@ -5,12 +5,14 @@ import { useDragDrop } from '../../hooks/useDragDrop';
 import { useElementDrag } from '../../hooks/useElementDrag';
 import { useResize } from '../../hooks/useResize';
 import { useMarqueeSelect } from '../../hooks/useMarqueeSelect';
+import { useCopyPaste } from '../../hooks/useCopyPaste';
 import CanvasElement from '../canvas/CanvasElement';
 import GuideLineRenderer from '../canvas/GuideLineRenderer';
 import LineRenderer from '../canvas/LineRenderer';
 import BoxRenderer from '../canvas/BoxRenderer';
 import GuideLines from '../canvas/GuideLines';
 import MultiSelectOverlay from '../canvas/MultiSelectOverlay';
+import ContextMenu from '../canvas/ContextMenu';
 
 const PADDING_LOGICAL = 8;
 
@@ -28,6 +30,7 @@ export default function Canvas() {
   const { onPointerDown } = useElementDrag();
   const { onResizeStart } = useResize();
   const { marquee, onCanvasMouseDown, onCanvasMouseMove, onCanvasMouseUp } = useMarqueeSelect();
+  const { contextMenu, closeContextMenu, registerCanvasInner, showContextMenu } = useCopyPaste();
 
   const canvasBounds = getCanvasBounds();
   const pad = PADDING_LOGICAL * zoom;
@@ -59,8 +62,17 @@ export default function Canvas() {
     (el: HTMLDivElement | null) => {
       setCanvasRef(el);
       canvasInnerRef.current = el;
+      registerCanvasInner(el);
     },
-    [setCanvasRef],
+    [setCanvasRef, registerCanvasInner],
+  );
+
+  // Right-click context menu handler
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      showContextMenu(e, canvasInnerRef.current);
+    },
+    [showContextMenu],
   );
 
   const elementList = Object.values(elements).filter((el) => el.pageIndex === currentPage);
@@ -76,6 +88,7 @@ export default function Canvas() {
       onMouseMove={(e) => onCanvasMouseMove(e, canvasInnerRef.current)}
       onMouseUp={onCanvasMouseUp}
       onWheel={handleWheel}
+      onContextMenu={handleContextMenu}
       data-testid="canvas-area"
     >
       <div style={{ display: 'flex', minHeight: '100%', minWidth: 'fit-content' }}>
@@ -140,6 +153,16 @@ export default function Canvas() {
           </div>
         </div>
       </div>
+
+      {/* Context menu */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={contextMenu.items}
+          onClose={closeContextMenu}
+        />
+      )}
     </main>
   );
 }
