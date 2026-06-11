@@ -42,7 +42,11 @@ export default function FormatToolbar({ visible, editor }: FormatToolbarProps) {
       className="flex items-center gap-1 p-1.5 bg-white border border-gray-300 rounded-lg shadow-lg"
       style={{ position: 'absolute', top: '-48px', left: '0', zIndex: 10000, whiteSpace: 'nowrap' }}
       data-testid="format-toolbar"
-      onMouseDown={(e) => e.preventDefault()}
+      onMouseDown={(e) => {
+        // Don't prevent default on selects/inputs — they need mousedown to open
+        const tag = (e.target as HTMLElement).tagName;
+        if (tag !== 'SELECT' && tag !== 'INPUT') e.preventDefault();
+      }}
     >
       {/* Font family */}
       <div style={{ width: 130 }}>
@@ -61,7 +65,6 @@ export default function FormatToolbar({ visible, editor }: FormatToolbarProps) {
           editor.chain().focus().setMark('textStyle', { fontSize: `${e.target.value}px` }).run();
         }}
         className="h-7 text-xs border border-gray-300 rounded px-1 bg-white"
-        onMouseDown={(e) => e.stopPropagation()}
       >
         {FONT_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
       </select>
@@ -77,7 +80,6 @@ export default function FormatToolbar({ visible, editor }: FormatToolbarProps) {
         }}
         className="w-6 h-6 rounded border border-gray-300 cursor-pointer p-0"
         title="Text color"
-        onMouseDown={(e) => e.stopPropagation()}
       />
       <div className="w-px h-5 bg-gray-200 mx-0.5" />
 
