@@ -151,9 +151,11 @@ function TextElementView({ element, isSelected, isEditing, onPointerDown, onResi
           left: `${element.x}px`,
           top: `${element.y}px`,
           zIndex: 100000,
-          pointerEvents: 'auto',
-        }}>
-          <FormatToolbar visible={true} editor={editor} />
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <FormatToolbar visible={true} editor={editor} />
         </div>,
         document.querySelector('[data-canvas-inner="true"]') || document.body,
       )}
