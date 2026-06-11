@@ -152,11 +152,12 @@ export function useCopyPaste() {
       const meta = e.metaKey || e.ctrlKey;
       if (!meta) return;
 
-      // Cmd+C — copy selected elements (skip if text is selected in editable)
+      const active = document.activeElement as HTMLElement | null;
+      const inEditable = !!(active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable || active.closest('[contenteditable="true"]')));
+
+      // Cmd+C
       if (e.code === 'KeyC' && !e.shiftKey) {
-        const t = e.target as HTMLElement;
-        if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') return;
-        if ((t.isContentEditable || t.closest('[contenteditable="true"]')) && window.getSelection() && !window.getSelection()!.isCollapsed) return;
+        if (inEditable) return; // browser handles copy natively
         e.preventDefault();
         handleCopy();
         return;
@@ -164,17 +165,12 @@ export function useCopyPaste() {
 
       // Cmd+V
       if (e.code === 'KeyV' && !e.shiftKey) {
-        const t = e.target as HTMLElement;
-        if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') return;
-
-        if (t.isContentEditable) {
-          // In contentEditable → paste text at cursor
+        if (inEditable) {
           e.preventDefault();
           const txt = await readSystemClipboardText();
           if (txt) {
             insertTextAtCursor(txt);
-            // Sync to store
-            const wrapper = t.closest('[data-testid^="element-"]') as HTMLElement | null;
+            const wrapper = active?.closest('[data-testid^="element-"]') as HTMLElement | null;
             const ceEl = wrapper?.querySelector('[contenteditable="true"]') as HTMLElement | null;
             if (wrapper && ceEl) {
               const id = (wrapper.dataset.testid || '').replace('element-', '');
@@ -183,8 +179,6 @@ export function useCopyPaste() {
           }
           return;
         }
-
-        // On canvas → paste as new element
         e.preventDefault();
         doPaste(_lastMouseClientX, _lastMouseClientY);
       }
