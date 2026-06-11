@@ -70,27 +70,6 @@ export default function TextProperties({ element, onUpdate, disabled }: TextProp
         />
       </PropertyGroup>
 
-      <PropertyGroup label="Style">
-        <div className="flex gap-1">
-          <ToggleButton
-            active={element.defaultFontWeight >= 700}
-            onClick={() => {
-              if (isInline) ed?.chain().focus().toggleBold().run();
-              else handleChange('defaultFontWeight', element.defaultFontWeight >= 700 ? 400 : 700);
-            }}
-            disabled={disabled} title="Bold"
-          ><strong>B</strong></ToggleButton>
-          <ToggleButton
-            active={element.defaultFontStyle === 'italic'}
-            onClick={() => {
-              if (isInline) ed?.chain().focus().toggleItalic().run();
-              else handleChange('defaultFontStyle', element.defaultFontStyle === 'italic' ? 'normal' : 'italic');
-            }}
-            disabled={disabled} title="Italic"
-          ><em>I</em></ToggleButton>
-        </div>
-      </PropertyGroup>
-
       <PropertyGroup label="Align">
         <div className="flex gap-1">
           {(['left', 'center', 'right'] as const).map((align) => (
