@@ -1,33 +1,37 @@
-// ============================================================
-// Internal clipboard — stores copied canvas elements for
-// in-app copy/paste. Separate from the system clipboard,
-// which is used for importing external text/images.
-// ============================================================
+// Unified internal clipboard — stores either text or elements.
+// Both Cmd+C (text/elements) and menu Copy feed into the same cache.
+// Paste reads from cache and handles accordingly.
 
 import type { CanvasElement } from '../types/elements';
 
-let _clipboard: CanvasElement[] = [];
+export interface ClipBoardCache {
+  type: 'text' | 'elements' | null;
+  text: string;
+  elements: CanvasElement[];
+}
+
+let _cache: ClipBoardCache = { type: null, text: '', elements: [] };
 
 function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
 }
 
-/** Copy elements to the internal clipboard */
-export function setCopiedElements(elements: CanvasElement[]): void {
-  _clipboard = deepClone(elements);
+export function setClipboardText(text: string): void {
+  _cache = { type: 'text', text, elements: [] };
 }
 
-/** Get (a clone of) the copied elements */
-export function getCopiedElements(): CanvasElement[] {
-  return deepClone(_clipboard);
+export function setClipboardElements(elements: CanvasElement[]): void {
+  _cache = { type: 'elements', text: '', elements: deepClone(elements) };
 }
 
-/** Check if the internal clipboard has any elements */
-export function hasCopiedElements(): boolean {
-  return _clipboard.length > 0;
+export function getClipboard(): ClipBoardCache {
+  return deepClone(_cache);
 }
 
-/** Clear the internal clipboard */
-export function clearClipboard(): void {
-  _clipboard = [];
+export function hasClipboard(): boolean {
+  return _cache.type !== null;
+}
+
+export function clearCache(): void {
+  _cache = { type: null, text: '', elements: [] };
 }
