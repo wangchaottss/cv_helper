@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
 import type { TextElement } from '../../types/elements';
-import { detectMixedFonts, applyFormat } from '../../utils/richText';
+import { detectMixedFonts, applyFormat, getActiveFormats } from '../../utils/richText';
 import { useEditorStore } from '../../store/editorStore';
 import FontSelector from './FontSelector';
 
@@ -38,29 +38,35 @@ export default function TextProperties({ element, onUpdate, disabled }: TextProp
     },
     [onUpdate],
   );
-  // Map CSS property names to TextElement field names for element-level updates
-  const CSS_TO_ELEMENT: Record<string, keyof TextElement> = {
-    'font-family': 'defaultFontFamily',
-    'font-size': 'defaultFontSize',
-    'color': 'defaultColor',
-    'font-weight': 'defaultFontWeight',
-    'font-style': 'defaultFontStyle',
-  };
-  // Apply inline format when text is selected, otherwise update element default
-  const handleInlineFormat = useCallback(
-    (cssProp: string, cssValue: string) => {
+
+  // Unified toggle for Bold/Italic — same logic as FormatToolbar.
+  // When text is selected: toggles inline via getActiveFormats + applyFormat.
+  // When no selection: toggles element default via onUpdate.
+  const handleToggle = useCallback(
+    (cssProp: string, onVal: string, offVal: string, field: keyof TextElement, elementIsOn: boolean, elementOnVal: string | number, elementOffVal: string | number) => {
+      if (hasTextSelection(element.id)) {
+        const fmt = getActiveFormats();
+        let isOn = false;
+        if (cssProp === 'font-weight') isOn = fmt.fontWeight === '700' || fmt.fontWeight === 'bold';
+        else if (cssProp === 'font-style') isOn = fmt.fontStyle === 'italic';
+        applyFormat(cssProp, isOn ? offVal : onVal);
+        syncContentAfterFormat(element.id);
+      } else {
+        onUpdate({ [field]: elementIsOn ? elementOffVal : elementOnVal } as Partial<TextElement>);
+      }
+    },
+    [element.id, onUpdate],
+  );
+
+  // For Font/Size/Color: apply inline if selection exists, else element default
+  const handleSet = useCallback(
+    (cssProp: string, cssValue: string, field: keyof TextElement) => {
       if (hasTextSelection(element.id)) {
         applyFormat(cssProp, cssValue);
         syncContentAfterFormat(element.id);
       } else {
-        const field = CSS_TO_ELEMENT[cssProp] as keyof TextElement;
-        if (field) {
-          const value: string | number =
-            field === 'defaultFontSize' || field === 'defaultFontWeight'
-              ? parseFloat(cssValue)
-              : cssValue;
-          onUpdate({ [field]: value });
-        }
+        const val: string | number = field === 'defaultFontSize' ? parseFloat(cssValue) : cssValue;
+        onUpdate({ [field]: val });
       }
     },
     [element.id, onUpdate],
@@ -77,7 +83,7 @@ export default function TextProperties({ element, onUpdate, disabled }: TextProp
         )}
         <FontSelector
           value={hasMixedFonts ? '' : element.defaultFontFamily}
-          onChange={(font) => handleInlineFormat('font-family', font)}
+          onChange={(font) => handleSet('font-family', font, 'defaultFontFamily')}
           disabled={disabled}
           placeholder={hasMixedFonts ? 'Mixed' : undefined}
         />
@@ -90,7 +96,7 @@ export default function TextProperties({ element, onUpdate, disabled }: TextProp
             value={element.defaultFontSize}
             min={8}
             max={72}
-            onChange={(v) => handleInlineFormat('font-size', `${v}px`)}
+            onChange={(v) => handleSet('font-size', `${v}px`, 'defaultFontSize')}
             disabled={disabled}
           />
           <span className="text-xs text-gray-400">px</span>
@@ -101,7 +107,7 @@ export default function TextProperties({ element, onUpdate, disabled }: TextProp
       <PropertyGroup label="Color">
         <ColorInput
           value={element.defaultColor}
-          onChange={(v) => handleInlineFormat('color', v)}
+          onChange={(v) => handleSet('color', v, 'defaultColor')}
           disabled={disabled}
         />
       </PropertyGroup>
@@ -112,7 +118,7 @@ export default function TextProperties({ element, onUpdate, disabled }: TextProp
           <ToggleButton
             active={element.defaultFontWeight >= 700}
             onClick={() =>
-              handleInlineFormat('font-weight', element.defaultFontWeight >= 700 ? '400' : '700')
+              handleToggle('font-weight', '700', '400', 'defaultFontWeight', element.defaultFontWeight >= 700, 700, 400)
             }
             disabled={disabled}
             title="Bold"
@@ -122,7 +128,7 @@ export default function TextProperties({ element, onUpdate, disabled }: TextProp
           <ToggleButton
             active={element.defaultFontStyle === 'italic'}
             onClick={() =>
-              handleInlineFormat('font-style', element.defaultFontStyle === 'italic' ? 'normal' : 'italic')
+              handleToggle('font-style', 'italic', 'normal', 'defaultFontStyle', element.defaultFontStyle === 'italic', 'italic', 'normal')
             }
             disabled={disabled}
             title="Italic"

@@ -5,6 +5,9 @@
 /**
  * Apply a CSS property to the current text selection by wrapping in a span.
  */
+// Values that mean "remove this format" — unwrap only, don't re-wrap
+const RESET_VALUES = new Set(['none', 'normal', '400', 'transparent']);
+
 export function applyFormat(property: string, value: string): void {
   const selection = window.getSelection();
   if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
@@ -12,14 +15,19 @@ export function applyFormat(property: string, value: string): void {
   const range = selection.getRangeAt(0);
   if (range.collapsed) return;
 
-  // Save selection boundaries before DOM mutation
-  const startContainer = range.startContainer;
-  const startOffset = range.startOffset;
-  const endContainer = range.endContainer;
-  const endOffset = range.endOffset;
-
-  // Unwrap existing spans with the same property before re-wrapping
+  // Unwrap existing spans with the same property
   unwrapPropertyInRange(range, property);
+
+  // If value means "remove", just unwrap and restore cursor
+  if (RESET_VALUES.has(value)) {
+    try {
+      // Collapse selection to start of the (now unwrapped) range
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    } catch { /* ignore */ }
+    return;
+  }
 
   const span = document.createElement('span');
   span.style.setProperty(property, value);
@@ -28,7 +36,6 @@ export function applyFormat(property: string, value: string): void {
   // Restore selection inside the new span
   try {
     const newRange = document.createRange();
-    // The content is now inside the <span>
     if (span.firstChild) {
       newRange.setStart(span.firstChild, 0);
       newRange.setEnd(span.lastChild!, (span.lastChild as Text).length || (span.lastChild?.textContent?.length || 0));
@@ -38,14 +45,13 @@ export function applyFormat(property: string, value: string): void {
     selection.removeAllRanges();
     selection.addRange(newRange);
   } catch {
-    // If restoration fails, at least collapse to the end of the span
     try {
       const fallback = document.createRange();
       fallback.selectNodeContents(span);
       fallback.collapse(false);
       selection.removeAllRanges();
       selection.addRange(fallback);
-    } catch { /* give up */ }
+    } catch { /* ignore */ }
   }
 }
 
