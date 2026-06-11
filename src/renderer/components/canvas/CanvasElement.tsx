@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -50,62 +50,69 @@ function TextElementView({ element, isSelected, isEditing, onPointerDown, onResi
   if (element.type !== 'text') return null;
   const updateElement = useEditorStore((s) => s.updateElement);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevEditingRef = useRef(false);
 
+  // Create editor once with initial content, always editable.
+  // Overlay div controls click behavior (edit vs drag) based on isEditing.
   const editor = useEditor({
-    editable: isEditing,
-    content: element.contentHTML,
     extensions: [
       StarterKit.configure({ heading: false, codeBlock: false, blockquote: false, horizontalRule: false }),
-      Underline,
-      TextStyle,
-      Color,
-      FontFamily,
-      FontSize,
+      Underline, TextStyle, Color, FontFamily, FontSize,
       TextAlign.configure({ types: ['paragraph'] }),
       Highlight.configure({ multicolor: true }),
     ],
+    content: element.contentHTML,
+    editable: true,
     onUpdate: ({ editor: ed }) => {
-      // Debounce store updates
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         updateElement(element.id, { contentHTML: ed.getHTML() });
       }, 300);
     },
     editorProps: {
-      // Paste plain text only — prevent external formatting from leaking in
       transformPastedHTML: (html: string) => {
         const div = document.createElement('div');
         div.innerHTML = html;
         return div.textContent?.replace(/\n/g, '<br>') || '';
       },
       attributes: {
-        style: `font-family: ${element.defaultFontFamily}; font-size: ${element.defaultFontSize}px; color: ${element.defaultColor}; font-weight: ${element.defaultFontWeight}; font-style: ${element.defaultFontStyle}; text-align: ${element.defaultTextAlign}; line-height: ${element.defaultLineHeight}; background-color: ${element.defaultBackgroundColor}; padding: 4px; overflow: hidden; word-break: break-word; white-space: pre-wrap; outline: none;`,
+        style: `font-family: ${element.defaultFontFamily}; font-size: ${element.defaultFontSize}px; color: ${element.defaultColor}; font-weight: ${element.defaultFontWeight}; font-style: ${element.defaultFontStyle}; text-align: ${element.defaultTextAlign}; line-height: ${element.defaultLineHeight}; background-color: ${element.defaultBackgroundColor}; padding: 4px; overflow: hidden; word-break: break-word; white-space: pre-wrap; outline: none; cursor: text;`,
       },
       handleDOMEvents: {
         focus: () => { setActiveEditor(editor); return false; },
         blur: () => {
           setActiveEditor(null);
-          // Flush pending update on blur
           if (debounceRef.current) {
             clearTimeout(debounceRef.current);
             debounceRef.current = null;
           }
           updateElement(element.id, { contentHTML: editor?.getHTML() || element.contentHTML });
-          return false; // let event propagate
+          return false;
         },
       },
     },
-    // Immediately render with content (no SSR mismatch)
     immediatelyRender: false,
   });
 
-  // Auto-focus when entering edit mode
+  // Sync content from store when entering edit mode or when changed externally
   useEffect(() => {
-    if (isEditing && editor) {
-      const timer = setTimeout(() => editor.commands.focus('end'), 0);
-      return () => clearTimeout(timer);
+    if (!editor) return;
+    const wasEditing = prevEditingRef.current;
+    prevEditingRef.current = isEditing;
+
+    if (isEditing && !wasEditing) {
+      // Entering edit mode: sync latest content from store, then focus
+      editor.commands.setContent(element.contentHTML);
+      setTimeout(() => editor.commands.focus('end'), 50);
+    } else if (!isEditing && wasEditing) {
+      // Exiting edit mode: flush content to store
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+      updateElement(element.id, { contentHTML: editor.getHTML() });
     }
-  }, [isEditing, editor]);
+  }, [isEditing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const baseStyle: React.CSSProperties = {
     position: 'absolute',
@@ -135,11 +142,24 @@ function TextElementView({ element, isSelected, isEditing, onPointerDown, onResi
       onDoubleClick={onDoubleClick}
     >
       <FormatToolbar visible={isEditing} editor={editor} />
-      <div
-        style={{ width: '100%', height: '100%', cursor: isEditing ? 'text' : 'move' }}
-        onPointerDown={(e) => { if (isEditing) e.stopPropagation(); }}
-      >
+      <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+        {/* Tiptap editor — always rendered, always editable */}
         <EditorContent editor={editor} />
+
+        {/* Overlay: when NOT editing, blocks all pointer events from reaching
+            Tiptap. Clicks go to outer wrapper (select/drag), double-click → edit */}
+        {!isEditing && (
+          <div
+            style={{
+              position: 'absolute', inset: 0,
+              cursor: 'move',
+            }}
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              onDoubleClick(e);
+            }}
+          />
+        )}
       </div>
       {isSelected && !isEditing && renderControlPoints(element.width, element.height, element.id, onResizeStart)}
     </div>
