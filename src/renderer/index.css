@@ -25,8 +25,8 @@ body {
   outline: none;
   min-height: 100%;
 }
-.tiptap ul { padding-left: 1.5em; }
-.tiptap ol { padding-left: 1.5em; }
+.tiptap ul { padding-left: 1.5em; list-style-position: inside; }
+.tiptap ol { padding-left: 1.5em; list-style-position: inside; }
 .tiptap p { margin: 0; }
 .tiptap h1, .tiptap h2, .tiptap h3 { margin: 0.5em 0; }
 

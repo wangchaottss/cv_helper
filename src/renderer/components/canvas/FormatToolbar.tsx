@@ -44,8 +44,8 @@ export default function FormatToolbar({ visible, editor }: FormatToolbarProps) {
       data-testid="format-toolbar"
       onMouseDown={(e) => {
         // Don't prevent default on selects/inputs — they need mousedown to open
-        const tag = (e.target as HTMLElement).tagName;
-        if (tag !== 'SELECT' && tag !== 'INPUT') e.preventDefault();
+        const el = e.target as HTMLElement;
+        if (!el.closest('select') && !el.closest('input')) e.preventDefault();
       }}
     >
       {/* Font family */}
