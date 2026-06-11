@@ -150,7 +150,7 @@ export function useCopyPaste() {
   // fires on editable elements, not on our canvas div.
   // ================================================================
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
+    const onKey = async (e: KeyboardEvent) => {
       const meta = e.metaKey || e.ctrlKey;
       if (!meta) return;
 
@@ -167,10 +167,41 @@ export function useCopyPaste() {
       // Cmd+V
       if (e.code === 'KeyV' && !e.shiftKey) {
         const t = e.target as HTMLElement;
-        // editable → let browser handle paste
+        // native inputs → let browser handle
         if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') return;
-        if (t.isContentEditable) return;
-        // canvas → our paste
+
+        if (t.isContentEditable) {
+          // Editing text → insert clipboard text at cursor
+          console.warn('[keydown] Cmd+V in contentEditable');
+          e.preventDefault();
+          const txt = await readSystemClipboardText();
+          if (txt) {
+            const sel = window.getSelection();
+            if (sel?.rangeCount) {
+              const r = sel.getRangeAt(0);
+              r.deleteContents();
+              const tn = document.createTextNode(txt);
+              r.insertNode(tn);
+              r.setStartAfter(tn);
+              r.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(r);
+              // Sync to store
+              const wrapper = r.commonAncestorContainer.parentElement?.closest('[data-testid^="element-"]') as HTMLElement | null;
+              if (wrapper) {
+                const id = (wrapper.dataset.testid || '').replace('element-', '');
+                const ceEl = wrapper.querySelector('[contenteditable="true"]') as HTMLElement | null;
+                if (ceEl && id) {
+                  useEditorStore.getState().updateElement(id, { contentHTML: ceEl.innerHTML });
+                  console.warn('[keydown] pasted into contentEditable, synced to store');
+                }
+              }
+            }
+          }
+          return;
+        }
+
+        // canvas → paste as new element
         console.warn('[keydown] Cmd+V on canvas, target:', t.tagName);
         e.preventDefault();
         doPaste(_lastMouseClientX, _lastMouseClientY);
@@ -263,46 +294,24 @@ export function useCopyPaste() {
       label: 'Paste', shortcut: '⌘V',
       action: async () => {
         if (isEditing) {
-          // Paste text into contentEditable at saved cursor
+          // Paste at saved cursor position. Focus is preserved because
+          // ContextMenu prevents mousedown (no blur, no React re-render).
           const txt = await readSystemClipboardText();
-          if (!txt) { console.warn('[ctxmenu] no text to paste'); return; }
-
-          const range = _savedRange;
+          if (!txt || !_savedRange) { _savedRange = null; return; }
+          const r = _savedRange;
           _savedRange = null;
-
-          // Restore focus to the contentEditable and use saved range
-          const editableEl = range?.commonAncestorContainer.parentElement?.closest('[contenteditable="true"]') as HTMLElement | null;
-          if (editableEl) {
-            // Focus WITHOUT triggering blur (ensure isEditing stays true)
-            editableEl.focus({ preventScroll: true });
-          }
-
           const sel = window.getSelection();
-          if (sel && range) {
-            sel.removeAllRanges();
-            sel.addRange(range);
-            range.deleteContents();
-            const tn = document.createTextNode(txt);
-            range.insertNode(tn);
-            range.setStartAfter(tn);
-            range.collapse(true);
-            sel.removeAllRanges();
-            sel.addRange(range);
-
-            // Manually sync content to store (in case React re-renders)
-            if (range.commonAncestorContainer.parentElement?.closest('[contenteditable="true"]')) {
-              // Find the element ID from the contentEditable wrapper
-              const wrapper = range.commonAncestorContainer.parentElement.closest('[data-testid^="element-"]') as HTMLElement | null;
-              if (wrapper) {
-                const id = (wrapper.dataset.testid || '').replace('element-', '');
-                const ceEl = wrapper.querySelector('[contenteditable="true"]') as HTMLElement | null;
-                if (ceEl && id) {
-                  useEditorStore.getState().updateElement(id, { contentHTML: ceEl.innerHTML });
-                  console.warn('[ctxmenu] pasted text, synced to store');
-                }
-              }
-            }
-          }
+          if (!sel) return;
+          sel.removeAllRanges();
+          sel.addRange(r);
+          r.deleteContents();
+          const tn = document.createTextNode(txt);
+          r.insertNode(tn);
+          r.setStartAfter(tn);
+          r.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(r);
+          console.warn('[ctxmenu] pasted into contentEditable');
         } else {
           await doPaste(e.clientX, e.clientY);
         }

@@ -59,6 +59,7 @@ export default function ContextMenu({ x, y, items, onClose }: ContextMenuProps) 
       style={menuStyle}
       className="bg-white border border-gray-200 rounded-lg shadow-xl py-1 min-w-[160px]"
       onContextMenu={(e) => e.preventDefault()}
+      onMouseDown={(e) => e.preventDefault()}
     >
       {items.map((item, i) => (
         <button
