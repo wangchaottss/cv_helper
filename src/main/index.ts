@@ -85,10 +85,12 @@ function buildMenu() {
         { type: 'separator' },
         {
           label: 'Copy',
+          accelerator: 'CmdOrCtrl+C',
           click: () => mainWindow?.webContents.send('menu-copy'),
         },
         {
           label: 'Paste',
+          accelerator: 'CmdOrCtrl+V',
           click: () => mainWindow?.webContents.send('menu-paste'),
         },
         { type: 'separator' },

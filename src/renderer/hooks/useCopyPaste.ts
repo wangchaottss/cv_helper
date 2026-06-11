@@ -6,51 +6,56 @@ import { createDefaultTextElement, createDefaultImageElement } from './useDragDr
 import type { CanvasElement, TextElement, ImageElement } from '../types/elements';
 import type { ContextMenuItem } from '../components/canvas/ContextMenu';
 
-// Global references — allow the App menu to trigger copy/paste
+// ============================================================
+// Module-level globals — survive outside React lifecycle so
+// menu IPC and keyboard handlers can always access them.
+// ============================================================
+
+let _lastMouseClientX = 0;
+let _lastMouseClientY = 0;
+
 let _globalCopy: (() => void) | null = null;
 let _globalPaste: ((clientX: number, clientY: number) => Promise<void>) | null = null;
 
+/** Called from App.tsx when menu-copy is received (via Electron menu Cmd+C) */
 export function triggerGlobalCopy(): void {
   _globalCopy?.();
 }
 
+/** Called from App.tsx when menu-paste is received (via Electron menu Cmd+V) */
 export async function triggerGlobalPaste(): Promise<void> {
-  const x = window.innerWidth / 2;
-  const y = window.innerHeight / 2;
+  const x = _lastMouseClientX || window.innerWidth / 2;
+  const y = _lastMouseClientY || window.innerHeight / 2;
   await _globalPaste?.(x, y);
 }
+
+// ============================================================
+// Helpers
+// ============================================================
 
 function newPastedId(): string {
   return `paste-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-// ============================================================
-// System clipboard access
-// ============================================================
-
 async function readSystemClipboardText(): Promise<string | null> {
-  // Primary: Electron IPC (clipboard module in main process)
   if (window.electronAPI?.readClipboardText) {
     try {
       const text = await window.electronAPI.readClipboardText();
-      console.log('[useCopyPaste] IPC clipboard text:', text ? `"${text.slice(0, 50)}..."` : '(empty)');
+      console.log('[useCopyPaste] IPC text:', text ? `"${text.slice(0, 50)}"` : '(empty)');
       if (text && text.trim()) return text;
     } catch (err) {
-      console.error('[useCopyPaste] IPC clipboard readText failed:', err);
+      console.error('[useCopyPaste] IPC readText error:', err);
     }
-  } else {
-    console.log('[useCopyPaste] window.electronAPI?.readClipboardText not available');
   }
-
-  // Fallback: navigator.clipboard API
+  // Fallback
   try {
     if (navigator.clipboard?.readText) {
       const text = await navigator.clipboard.readText();
-      console.log('[useCopyPaste] navigator.clipboard text:', text ? `"${text.slice(0, 50)}..."` : '(empty)');
+      console.log('[useCopyPaste] nav text:', text ? `"${text.slice(0, 50)}"` : '(empty)');
       if (text && text.trim()) return text;
     }
   } catch (err) {
-    console.error('[useCopyPaste] navigator.clipboard.readText failed:', err);
+    console.error('[useCopyPaste] nav readText error:', err);
   }
   return null;
 }
@@ -60,11 +65,11 @@ async function readSystemClipboardImage(): Promise<string | null> {
     try {
       const dataUrl = await window.electronAPI.readClipboardImage();
       if (dataUrl) {
-        console.log('[useCopyPaste] IPC clipboard image found');
+        console.log('[useCopyPaste] IPC image OK');
         return dataUrl;
       }
     } catch (err) {
-      console.error('[useCopyPaste] IPC clipboard readImage failed:', err);
+      console.error('[useCopyPaste] IPC readImage error:', err);
     }
   }
   return null;
@@ -76,40 +81,33 @@ async function writeSystemClipboard(text: string): Promise<void> {
       await navigator.clipboard.writeText(text);
     }
   } catch {
-    // Silently fail
+    // silently fail
   }
 }
 
-// ============================================================
-// Element offset helpers
-// ============================================================
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function offsetElement(el: CanvasElement, offsetX: number, offsetY: number, newId: string, pageIndex: number): any {
-  const canvasBounds = getCanvasBounds();
+  const cb = getCanvasBounds();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const cloned: any = JSON.parse(JSON.stringify(el));
-  cloned.id = newId;
-  cloned.pageIndex = pageIndex;
+  const c: any = JSON.parse(JSON.stringify(el));
+  c.id = newId;
+  c.pageIndex = pageIndex;
 
   if (el.type === 'line') {
-    cloned.x1 = Math.max(0, Math.min(canvasBounds.width, el.x1 + offsetX));
-    cloned.y1 = Math.max(0, Math.min(canvasBounds.height, el.y1 + offsetY));
-    cloned.x2 = Math.max(0, Math.min(canvasBounds.width, el.x2 + offsetX));
-    cloned.y2 = Math.max(0, Math.min(canvasBounds.height, el.y2 + offsetY));
+    c.x1 = Math.max(0, Math.min(cb.width, el.x1 + offsetX));
+    c.y1 = Math.max(0, Math.min(cb.height, el.y1 + offsetY));
+    c.x2 = Math.max(0, Math.min(cb.width, el.x2 + offsetX));
+    c.y2 = Math.max(0, Math.min(cb.height, el.y2 + offsetY));
   } else if (el.type === 'guideline') {
     const pos = el.position + (el.orientation === 'horizontal' ? offsetY : offsetX);
-    cloned.position = Math.max(0, Math.min(
-      el.orientation === 'horizontal' ? canvasBounds.height : canvasBounds.width,
-      pos,
-    ));
+    c.position = Math.max(0, Math.min(
+      el.orientation === 'horizontal' ? cb.height : cb.width, pos));
   } else if ('x' in el && 'y' in el && 'width' in el && 'height' in el) {
-    const clamped = clampToCanvas(el.x + offsetX, el.y + offsetY, el.width, el.height, canvasBounds);
-    cloned.x = clamped.x;
-    cloned.y = clamped.y;
+    const clamped = clampToCanvas(el.x + offsetX, el.y + offsetY, el.width, el.height, cb);
+    c.x = clamped.x;
+    c.y = clamped.y;
   }
-
-  return cloned;
+  return c;
 }
 
 // ============================================================
@@ -121,7 +119,6 @@ export function useCopyPaste() {
     x: number; y: number; items: ContextMenuItem[];
   } | null>(null);
 
-  const lastMouseRef = useRef<{ clientX: number; clientY: number }>({ clientX: 0, clientY: 0 });
   const canvasInnerRef = useRef<HTMLElement | null>(null);
 
   const registerCanvasInner = useCallback((el: HTMLElement | null) => {
@@ -132,10 +129,11 @@ export function useCopyPaste() {
     setContextMenu(null);
   }, []);
 
-  // Track mouse position
+  // Track mouse position globally (module level) so menu IPC can use it
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      lastMouseRef.current = { clientX: e.clientX, clientY: e.clientY };
+      _lastMouseClientX = e.clientX;
+      _lastMouseClientY = e.clientY;
     };
     window.addEventListener('mousemove', handler);
     return () => window.removeEventListener('mousemove', handler);
@@ -144,105 +142,88 @@ export function useCopyPaste() {
   // ---------- Copy ----------
   const handleCopy = useCallback(() => {
     const state = useEditorStore.getState();
-    const selectedIds = state.selection;
-    if (selectedIds.length === 0) return;
+    const ids = state.selection;
+    if (ids.length === 0) return;
 
-    const elements = selectedIds
+    const elements = ids
       .map((id) => state.elements[id])
       .filter(Boolean) as CanvasElement[];
-
     if (elements.length === 0) return;
 
     setCopiedElements(elements);
+    console.log('[useCopyPaste] Copied', elements.length, 'element(s)');
 
-    // Also write text to system clipboard
-    const textParts: string[] = [];
+    // Write text to system clipboard
+    const parts: string[] = [];
     for (const el of elements) {
       if (el.type === 'text') {
         const div = document.createElement('div');
         div.innerHTML = el.contentHTML;
-        textParts.push(div.textContent || '');
+        parts.push(div.textContent || '');
       }
     }
-    if (textParts.length > 0) {
-      writeSystemClipboard(textParts.join('\n'));
-    }
+    if (parts.length > 0) writeSystemClipboard(parts.join('\n'));
   }, []);
 
   // ---------- Paste ----------
   const doPaste = useCallback(
     async (clientX: number, clientY: number) => {
-      console.log('[useCopyPaste] doPaste called, clientX:', clientX, 'clientY:', clientY);
+      console.log('[useCopyPaste] doPaste at client', clientX, clientY);
 
-      const canvasInner = canvasInnerRef.current;
-      if (!canvasInner) {
-        console.log('[useCopyPaste] No canvasInner ref — aborting paste');
+      const inner = canvasInnerRef.current;
+      if (!inner) {
+        console.log('[useCopyPaste] SKIP: no canvasInner');
         return;
       }
 
       const store = useEditorStore.getState();
-      const zoom = store.zoom;
-      const rect = canvasInner.getBoundingClientRect();
-      const { x, y } = clientToCanvas(clientX, clientY, rect, zoom);
-      const pageIndex = store.currentPage;
+      const rect = inner.getBoundingClientRect();
+      const { x, y } = clientToCanvas(clientX, clientY, rect, store.zoom);
+      const page = store.currentPage;
+      console.log('[useCopyPaste] logical', x, y, 'page', page);
 
-      console.log('[useCopyPaste] Paste at logical coords:', x, y, 'page:', pageIndex);
-
-      // Determine what's in each clipboard
-      const hasInternal = hasCopiedElements();
-      console.log('[useCopyPaste] hasCopiedElements:', hasInternal);
-
-      // Read system clipboard (do this regardless of internal state)
+      // 1) System clipboard text (external content always wins)
       const sysText = await readSystemClipboardText();
-      const sysImage = sysText ? null : await readSystemClipboardImage();
-
-      // Priority: system clipboard text > system clipboard image > internal elements
-      // This ensures external content is always preferred
       if (sysText) {
-        console.log('[useCopyPaste] Creating text element from system clipboard');
-        const canvasBounds = getCanvasBounds();
-        const clamped = clampToCanvas(x - 150, y - 50, 300, 200, canvasBounds);
-        const escapedHTML = sysText
+        console.log('[useCopyPaste] → creating text element');
+        const cb = getCanvasBounds();
+        const clamped = clampToCanvas(x - 150, y - 50, 300, 200, cb);
+        const html = sysText
           .split('\n')
-          .map((line) =>
-            line
-              .replace(/&/g, '&amp;')
-              .replace(/</g, '&lt;')
-              .replace(/>/g, '&gt;'),
-          )
+          .map((l) => l.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'))
           .join('<br>');
-        const textEl: TextElement = {
-          ...createDefaultTextElement(clamped.x, clamped.y, pageIndex),
-          contentHTML: escapedHTML,
+        const el: TextElement = {
+          ...createDefaultTextElement(clamped.x, clamped.y, page),
+          contentHTML: html,
         };
-        store.addElement(textEl);
-        store.setSelection([textEl.id]);
-        console.log('[useCopyPaste] Text element created:', textEl.id);
-        // Clear internal clipboard — external text just took priority
+        store.addElement(el);
+        store.setSelection([el.id]);
+        console.log('[useCopyPaste] text element created:', el.id);
         clearClipboard();
         return;
       }
 
-      if (sysImage) {
-        console.log('[useCopyPaste] Creating image element from system clipboard');
-        const canvasBounds = getCanvasBounds();
-        const clamped = clampToCanvas(x - 100, y - 100, 200, 200, canvasBounds);
-        const imgEl: ImageElement = {
-          ...createDefaultImageElement(clamped.x, clamped.y, pageIndex),
-          src: sysImage,
-          width: 200,
-          height: 200,
+      // 2) System clipboard image
+      const sysImg = await readSystemClipboardImage();
+      if (sysImg) {
+        console.log('[useCopyPaste] → creating image element');
+        const cb = getCanvasBounds();
+        const clamped = clampToCanvas(x - 100, y - 100, 200, 200, cb);
+        const el: ImageElement = {
+          ...createDefaultImageElement(clamped.x, clamped.y, page),
+          src: sysImg,
+          width: 200, height: 200,
         };
-        store.addElement(imgEl);
-        store.setSelection([imgEl.id]);
-        console.log('[useCopyPaste] Image element created:', imgEl.id);
+        store.addElement(el);
+        store.setSelection([el.id]);
+        console.log('[useCopyPaste] image element created:', el.id);
         clearClipboard();
         return;
       }
 
-      // Fallback: internal clipboard elements
-      if (hasInternal) {
-        console.log('[useCopyPaste] Using internal clipboard elements');
+      // 3) Internal clipboard elements (fallback)
+      if (hasCopiedElements()) {
+        console.log('[useCopyPaste] → pasting internal elements');
         const copied = getCopiedElements();
 
         let minX = Infinity, minY = Infinity;
@@ -259,34 +240,29 @@ export function useCopyPaste() {
           }
         }
 
-        const offsetX = x - minX;
-        const offsetY = y - minY;
-
+        const ox = x - minX;
+        const oy = y - minY;
         const idMap = new Map<string, string>();
         const newIds: string[] = [];
         for (const el of copied) {
-          const newId = newPastedId();
-          idMap.set(el.id, newId);
-          newIds.push(newId);
+          const nid = newPastedId();
+          idMap.set(el.id, nid);
+          newIds.push(nid);
         }
-
         for (const el of copied) {
-          const newId = idMap.get(el.id)!;
-          const cloned = offsetElement(el, offsetX, offsetY, newId, pageIndex);
-          store.addElement(cloned as CanvasElement);
+          store.addElement(offsetElement(el, ox, oy, idMap.get(el.id)!, page) as CanvasElement);
         }
-
         store.setSelection(newIds);
         clearClipboard();
         return;
       }
 
-      console.log('[useCopyPaste] Nothing to paste — all clipboards empty');
+      console.log('[useCopyPaste] Nothing to paste');
     },
     [],
   );
 
-  // Register global handlers for App menu
+  // Register global handlers for menu IPC
   useEffect(() => {
     _globalCopy = handleCopy;
     _globalPaste = doPaste;
@@ -296,73 +272,36 @@ export function useCopyPaste() {
     };
   }, [handleCopy, doPaste]);
 
-  // ---------- Keyboard handlers ----------
-  useEffect(() => {
-    const handleKeyDown = async (e: KeyboardEvent) => {
-      const isMeta = e.metaKey || e.ctrlKey;
-
-      if (isMeta && e.key === 'c' && !e.shiftKey) {
-        const target = e.target as HTMLElement;
-        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
-        if (target.isContentEditable) {
-          const sel = window.getSelection();
-          if (sel && !sel.isCollapsed) return;
-        }
-        e.preventDefault();
-        handleCopy();
-        return;
-      }
-
-      if (isMeta && e.key === 'v' && !e.shiftKey) {
-        const target = e.target as HTMLElement;
-        console.log('[useCopyPaste] Cmd+V detected, target:', target.tagName, 'contentEditable:', target.isContentEditable);
-        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
-        if (target.isContentEditable) return;
-        e.preventDefault();
-        const { clientX, clientY } = lastMouseRef.current;
-        await doPaste(clientX, clientY);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleCopy, doPaste]);
-
   // ---------- Context menu ----------
   const showContextMenu = useCallback(
-    (e: React.MouseEvent, _canvasInnerEl: HTMLElement | null) => {
+    (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
 
       const store = useEditorStore.getState();
-      const hasSelection = store.selection.length > 0;
+      const hasSel = store.selection.length > 0;
 
       const target = e.target as HTMLElement;
-      const elementWrapper = target.closest('[data-testid^="element-"]') as HTMLElement | null;
-      if (elementWrapper) {
-        const raw = elementWrapper.dataset.testid || '';
-        const elementId = raw.replace('element-', '');
-        if (elementId && !store.selection.includes(elementId)) {
-          store.setSelection([elementId]);
+      const wrapper = target.closest('[data-testid^="element-"]') as HTMLElement | null;
+      if (wrapper) {
+        const id = (wrapper.dataset.testid || '').replace('element-', '');
+        if (id && !store.selection.includes(id)) {
+          store.setSelection([id]);
         }
       }
 
       const items: ContextMenuItem[] = [];
 
-      if (hasSelection || elementWrapper) {
+      if (hasSel || wrapper) {
         items.push({
-          label: 'Copy',
-          shortcut: '⌘C',
+          label: 'Copy', shortcut: '⌘C',
           action: () => handleCopy(),
         });
       }
 
       items.push({
-        label: 'Paste',
-        shortcut: '⌘V',
-        action: () => {
-          doPaste(e.clientX, e.clientY);
-        },
+        label: 'Paste', shortcut: '⌘V',
+        action: () => doPaste(e.clientX, e.clientY),
       });
 
       setContextMenu({ x: e.clientX, y: e.clientY, items });

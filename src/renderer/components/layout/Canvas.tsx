@@ -70,7 +70,7 @@ export default function Canvas() {
   // Right-click context menu handler
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
-      showContextMenu(e, canvasInnerRef.current);
+      showContextMenu(e);
     },
     [showContextMenu],
   );
