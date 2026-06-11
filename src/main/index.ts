@@ -25,6 +25,21 @@ function createWindow() {
     },
   });
 
+  // Show native context menu for editable elements (contentEditable).
+  // Custom context menu for canvas is handled by the renderer via
+  // a contextmenu event listener that calls preventDefault().
+  mainWindow.webContents.on('context-menu', (_event, params) => {
+    if (!params.isEditable) return; // canvas — renderer handles custom menu
+    const menu = Menu.buildFromTemplate([
+      { role: 'cut', label: 'Cut', enabled: params.editFlags.canCut },
+      { role: 'copy', label: 'Copy', enabled: params.editFlags.canCopy },
+      { role: 'paste', label: 'Paste', enabled: params.editFlags.canPaste },
+      { type: 'separator' },
+      { role: 'selectAll', label: 'Select All' },
+    ]);
+    menu.popup({ window: mainWindow! });
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
