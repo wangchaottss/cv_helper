@@ -67,9 +67,15 @@ export default function Canvas() {
     [setCanvasRef, registerCanvasInner],
   );
 
-  // Right-click context menu handler
+  // Right-click context menu handler.
+  // In contentEditable we let the browser's native menu handle paste (it
+  // knows the correct cursor position). Custom menu only for canvas area.
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.isContentEditable || target.closest('[contenteditable="true"]')) {
+        return; // native context menu handles paste at correct cursor position
+      }
       showContextMenu(e);
     },
     [showContextMenu],
