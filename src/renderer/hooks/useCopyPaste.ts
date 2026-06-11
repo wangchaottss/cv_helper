@@ -11,6 +11,7 @@ let _lastMouseClientX = 0;
 let _lastMouseClientY = 0;
 let _globalCopy: (() => void) | null = null;
 let _globalPaste: ((clientX: number, clientY: number) => Promise<void>) | null = null;
+let _rightClickSavedRange: Range | null = null;
 
 export function triggerGlobalCopy() { _globalCopy?.(); }
 export async function triggerGlobalPaste() {
@@ -73,6 +74,22 @@ export function useCopyPaste() {
     const h = (e: MouseEvent) => { _lastMouseClientX = e.clientX; _lastMouseClientY = e.clientY; };
     window.addEventListener('mousemove', h);
     return () => window.removeEventListener('mousemove', h);
+  }, []);
+
+  // On right-click, the browser moves the cursor to the click position during
+  // mousedown. Capture the selection in mouseup (after the move) so we have
+  // the correct range for context menu paste.
+  // Module-level so it survives React re-renders between mouseup and contextmenu.
+  useEffect(() => {
+    const onUp = (e: MouseEvent) => {
+      if (e.button !== 2) return;
+      const sel = window.getSelection();
+      if (sel?.rangeCount) {
+        _rightClickSavedRange = sel.getRangeAt(0).cloneRange();
+      }
+    };
+    window.addEventListener('mouseup', onUp);
+    return () => window.removeEventListener('mouseup', onUp);
   }, []);
 
   // ---- Copy ----
@@ -274,23 +291,13 @@ export function useCopyPaste() {
     const isEditing = t.isContentEditable || !!t.closest('[contenteditable="true"]');
     console.warn('[ctxmenu] isEditing:', isEditing, 'hasSel:', st.selection.length > 0);
 
-    // Save cursor range at exact right-click position.
-    // caretRangeFromPoint is Chromium-specific but handles <br> and empty
-    // lines correctly, unlike the newer caretPositionFromPoint or getSelection.
-    _savedRange = null;
-    if (isEditing) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const cr = (document as any).caretRangeFromPoint?.(e.clientX, e.clientY) as Range | null;
-      if (cr) {
-        _savedRange = cr.cloneRange();
-        console.warn('[ctxmenu] saved range via caretRangeFromPoint, collapsed:', cr.collapsed);
-      } else {
-        const sel = window.getSelection();
-        if (sel?.rangeCount) {
-          _savedRange = sel.getRangeAt(0).cloneRange();
-          console.warn('[ctxmenu] saved range via getSelection (fallback)');
-        }
-      }
+    // Use the range captured in mouseup (browser already moved cursor
+    // to the right-click position during mousedown).
+    if (isEditing && _rightClickSavedRange) {
+      console.warn('[ctxmenu] using mouseup range, collapsed:', _rightClickSavedRange.collapsed,
+        'node:', _rightClickSavedRange.startContainer.nodeName);
+    } else if (isEditing) {
+      console.warn('[ctxmenu] no mouseup range available');
     }
 
     const items: ContextMenuItem[] = [];
@@ -303,12 +310,10 @@ export function useCopyPaste() {
       label: 'Paste', shortcut: '⌘V',
       action: async () => {
         if (isEditing) {
-          // Paste at saved cursor position. Focus is preserved because
-          // ContextMenu prevents mousedown (no blur, no React re-render).
           const txt = await readSystemClipboardText();
-          if (!txt || !_savedRange) { _savedRange = null; return; }
-          const r = _savedRange;
-          _savedRange = null;
+          const r = _rightClickSavedRange;
+          _rightClickSavedRange = null;
+          if (!txt || !r) { console.warn('[ctxmenu] no text or no range'); return; }
           const sel = window.getSelection();
           if (!sel) return;
           sel.removeAllRanges();
