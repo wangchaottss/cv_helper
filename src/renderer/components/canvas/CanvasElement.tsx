@@ -76,7 +76,7 @@ function TextElementView({ element, isSelected, isEditing, onPointerDown, onResi
         return div.textContent?.replace(/\n/g, '<br>') || '';
       },
       attributes: {
-        style: `font-family: ${element.defaultFontFamily}; font-size: ${element.defaultFontSize}px; color: ${element.defaultColor}; font-weight: ${element.defaultFontWeight}; font-style: ${element.defaultFontStyle}; text-align: ${element.defaultTextAlign}; line-height: ${element.defaultLineHeight}; background-color: ${element.defaultBackgroundColor}; padding: 4px; overflow: auto; word-break: break-word; white-space: pre-wrap; outline: none; cursor: text;`,
+        style: `font-family: ${element.defaultFontFamily}; font-size: ${element.defaultFontSize}px; color: ${element.defaultColor}; font-weight: ${element.defaultFontWeight}; font-style: ${element.defaultFontStyle}; text-align: ${element.defaultTextAlign}; line-height: ${element.defaultLineHeight}; background-color: ${element.defaultBackgroundColor}; padding: 4px; overflow: hidden; word-break: break-word; white-space: pre-wrap; outline: none; cursor: text;`,
       },
       handleDOMEvents: {
         focus: () => { setActiveEditor(editor); return false; },

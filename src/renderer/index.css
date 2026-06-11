@@ -25,10 +25,10 @@ body {
   outline: none;
   min-height: 100%;
 }
-.tiptap ul { padding-left: 1.5em; list-style-type: disc; list-style-position: inside; }
+.tiptap ul { padding-left: 2em; list-style-type: disc; }
 .tiptap ul ul { list-style-type: circle; }
 .tiptap ul ul ul { list-style-type: square; }
-.tiptap ol { padding-left: 1.5em; list-style-type: decimal; list-style-position: inside; }
+.tiptap ol { padding-left: 2em; list-style-type: decimal; }
 .tiptap ol ol { list-style-type: lower-alpha; }
 .tiptap ol ol ol { list-style-type: lower-roman; }
 .tiptap p { margin: 0; }
