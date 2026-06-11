@@ -291,13 +291,21 @@ export function useCopyPaste() {
     const isEditing = t.isContentEditable || !!t.closest('[contenteditable="true"]');
     console.warn('[ctxmenu] isEditing:', isEditing, 'hasSel:', st.selection.length > 0);
 
-    // Use the range captured in mouseup (browser already moved cursor
-    // to the right-click position during mousedown).
-    if (isEditing && _rightClickSavedRange) {
-      console.warn('[ctxmenu] using mouseup range, collapsed:', _rightClickSavedRange.collapsed,
-        'node:', _rightClickSavedRange.startContainer.nodeName);
-    } else if (isEditing) {
-      console.warn('[ctxmenu] no mouseup range available');
+    // Prefer mouseup-captured range. On macOS trackpad two-finger tap,
+    // mouseup doesn't fire — the browser still moves the cursor, so
+    // fall back to current selection.
+    if (isEditing) {
+      if (_rightClickSavedRange) {
+        console.warn('[ctxmenu] using mouseup range, collapsed:', _rightClickSavedRange.collapsed);
+      } else {
+        const sel = window.getSelection();
+        if (sel?.rangeCount) {
+          _rightClickSavedRange = sel.getRangeAt(0).cloneRange();
+          console.warn('[ctxmenu] fallback to getSelection, collapsed:', _rightClickSavedRange.collapsed);
+        } else {
+          console.warn('[ctxmenu] no range available');
+        }
+      }
     }
 
     const items: ContextMenuItem[] = [];
