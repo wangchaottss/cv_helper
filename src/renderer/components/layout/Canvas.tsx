@@ -32,6 +32,10 @@ export default function Canvas() {
   const { marquee, onCanvasMouseDown, onCanvasMouseMove, onCanvasMouseUp } = useMarqueeSelect();
   const { contextMenu, closeContextMenu, registerCanvasInner, showContextMenu } = useCopyPaste();
 
+  // Keep latest showContextMenu in a ref for the native event listener
+  const showCtxRef = useRef(showContextMenu);
+  showCtxRef.current = showContextMenu;
+
   const canvasBounds = getCanvasBounds();
   const pad = PADDING_LOGICAL * zoom;
   const wrapperW = canvasBounds.width * zoom + pad * 2;
@@ -67,19 +71,20 @@ export default function Canvas() {
     [setCanvasRef, registerCanvasInner],
   );
 
-  // Right-click context menu handler.
-  // In contentEditable we let the browser's native menu handle paste (it
-  // knows the correct cursor position). Custom menu only for canvas area.
-  const handleContextMenu = useCallback(
-    (e: React.MouseEvent) => {
+  // Native contextmenu listener: more reliable than React synthetic for
+  // deciding between native menu (contentEditable) and custom menu (canvas).
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (target.isContentEditable || target.closest('[contenteditable="true"]')) {
-        return; // native context menu handles paste at correct cursor position
+        return; // browser native menu — handles paste at correct cursor
       }
-      showContextMenu(e);
-    },
-    [showContextMenu],
-  );
+      e.preventDefault();
+      showCtxRef.current(e as unknown as React.MouseEvent);
+    };
+    window.addEventListener('contextmenu', handler);
+    return () => window.removeEventListener('contextmenu', handler);
+  }, []);
 
   const elementList = Object.values(elements).filter((el) => el.pageIndex === currentPage);
 
@@ -94,7 +99,6 @@ export default function Canvas() {
       onMouseMove={(e) => onCanvasMouseMove(e, canvasInnerRef.current)}
       onMouseUp={onCanvasMouseUp}
       onWheel={handleWheel}
-      onContextMenu={handleContextMenu}
       data-testid="canvas-area"
     >
       <div style={{ display: 'flex', minHeight: '100%', minWidth: 'fit-content' }}>
