@@ -23,6 +23,12 @@ const electronAPI = {
   readBuiltInFont: (family: string, weight: number): Promise<string | null> =>
     ipcRenderer.invoke('font:readBuiltInFont', family, weight),
 
+  // Clipboard
+  readClipboardText: (): Promise<string> =>
+    ipcRenderer.invoke('clipboard:readText'),
+  readClipboardImage: (): Promise<string | null> =>
+    ipcRenderer.invoke('clipboard:readImage'),
+
   // PDF Export
   exportPDF: (elementsJson: string): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke('pdf:export', elementsJson),

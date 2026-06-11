@@ -33,8 +33,19 @@ function newPastedId(): string {
 
 /**
  * Read text from the system clipboard.
+ * Uses Electron IPC (main process clipboard module) for reliability.
  */
 async function readSystemClipboardText(): Promise<string | null> {
+  // Primary: Electron IPC (clipboard module in main process)
+  if (window.electronAPI?.readClipboardText) {
+    try {
+      const text = await window.electronAPI.readClipboardText();
+      if (text && text.trim()) return text;
+    } catch {
+      // Fall through to navigator fallback
+    }
+  }
+  // Fallback: navigator.clipboard API (works in secure contexts)
   try {
     if (navigator.clipboard?.readText) {
       const text = await navigator.clipboard.readText();
@@ -48,8 +59,19 @@ async function readSystemClipboardText(): Promise<string | null> {
 
 /**
  * Read an image from the system clipboard, returned as a data URL.
+ * Uses Electron IPC (main process clipboard + nativeImage) for reliability.
  */
 async function readSystemClipboardImage(): Promise<string | null> {
+  // Primary: Electron IPC
+  if (window.electronAPI?.readClipboardImage) {
+    try {
+      const dataUrl = await window.electronAPI.readClipboardImage();
+      if (dataUrl) return dataUrl;
+    } catch {
+      // Fall through to navigator fallback
+    }
+  }
+  // Fallback: navigator.clipboard API
   try {
     if (!navigator.clipboard?.read) return null;
     const items = await navigator.clipboard.read();

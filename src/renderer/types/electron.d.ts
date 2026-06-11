@@ -8,6 +8,8 @@ export interface ElectronAPI {
   readHtml: (path: string) => Promise<string>;
   readImage: (path: string) => Promise<string | null>;
   readBuiltInFont: (family: string, weight: number) => Promise<string | null>;
+  readClipboardText: () => Promise<string>;
+  readClipboardImage: () => Promise<string | null>;
   exportPDF: (elementsJson: string) => Promise<{ success: boolean; error?: string }>;
   onMenuCommand: (callback: (command: string) => void) => () => void;
 }

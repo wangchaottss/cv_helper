@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, dialog, clipboard, nativeImage } from 'electron';
 import { join } from 'path';
 import { readFile } from 'fs/promises';
 import { exportToPDF } from './pdfExport';
@@ -257,6 +257,21 @@ ipcMain.handle('font:readBuiltInFont', async (_event, family: string, weight: nu
 ipcMain.handle('pdf:export', async (_event, htmlString: string) => {
   if (!mainWindow) return { success: false, error: 'No active window' };
   return exportToPDF(htmlString, mainWindow);
+});
+
+// Clipboard: read text
+ipcMain.handle('clipboard:readText', () => {
+  return clipboard.readText();
+});
+
+// Clipboard: read image → base64 data URL
+ipcMain.handle('clipboard:readImage', () => {
+  const img = clipboard.readImage();
+  if (img.isEmpty()) return null;
+  // Convert to PNG data URL for broad compatibility
+  const pngBuffer = img.toPNG();
+  const base64 = pngBuffer.toString('base64');
+  return `data:image/png;base64,${base64}`;
 });
 
 // ============================================================
