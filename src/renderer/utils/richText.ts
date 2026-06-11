@@ -18,11 +18,10 @@ export function applyFormat(property: string, value: string): void {
   // Unwrap existing spans with the same property
   unwrapPropertyInRange(range, property);
 
-  // If value means "remove", just unwrap and restore cursor
+  // If value means "remove", just unwrap. The range should still be valid
+  // after DOM mutation (spec-compliant range tracking).
   if (RESET_VALUES.has(value)) {
     try {
-      // Collapse selection to start of the (now unwrapped) range
-      range.collapse(true);
       selection.removeAllRanges();
       selection.addRange(range);
     } catch { /* ignore */ }
@@ -33,26 +32,14 @@ export function applyFormat(property: string, value: string): void {
   span.style.setProperty(property, value);
   wrapRangeWithElement(range, span);
 
-  // Restore selection inside the new span
+  // Collapse cursor at the end of the new span (don't select everything)
   try {
     const newRange = document.createRange();
-    if (span.firstChild) {
-      newRange.setStart(span.firstChild, 0);
-      newRange.setEnd(span.lastChild!, (span.lastChild as Text).length || (span.lastChild?.textContent?.length || 0));
-    } else {
-      newRange.selectNodeContents(span);
-    }
+    newRange.selectNodeContents(span);
+    newRange.collapse(false); // collapse to end
     selection.removeAllRanges();
     selection.addRange(newRange);
-  } catch {
-    try {
-      const fallback = document.createRange();
-      fallback.selectNodeContents(span);
-      fallback.collapse(false);
-      selection.removeAllRanges();
-      selection.addRange(fallback);
-    } catch { /* ignore */ }
-  }
+  } catch { /* ignore */ }
 }
 
 /**
@@ -152,26 +139,47 @@ function wrapRangeWithElement(range: Range, wrapper: HTMLElement): void {
   }
 }
 
+// Map CSS property names to style property names for direct access
+const STYLE_PROP_MAP: Record<string, string> = {
+  'font-weight': 'fontWeight',
+  'font-style': 'fontStyle',
+  'text-decoration': 'textDecoration',
+  'font-family': 'fontFamily',
+  'font-size': 'fontSize',
+  'color': 'color',
+};
+
 function unwrapPropertyInRange(range: Range, property: string): void {
-  const container = range.commonAncestorContainer;
-  const parent = container.nodeType === Node.ELEMENT_NODE
-    ? (container as HTMLElement)
-    : container.parentElement;
+  // Find the contentEditable ancestor — only walk within it
+  let root: Node = range.commonAncestorContainer;
+  if (root.nodeType === Node.TEXT_NODE && root.parentElement) {
+    root = root.parentElement;
+  }
+  // Walk up to contentEditable ancestor
+  while (root.nodeType === Node.ELEMENT_NODE) {
+    const el = root as HTMLElement;
+    if (el.isContentEditable || el.closest('[contenteditable="true"]')) break;
+    if (!el.parentElement) break;
+    root = el.parentElement;
+  }
+  // If we found a contentEditable ancestor, use it as root
+  const ceRoot = (root as HTMLElement).isContentEditable
+    ? root as HTMLElement
+    : (root as HTMLElement).closest('[contenteditable="true"]') as HTMLElement | null;
 
-  if (!parent) return;
+  const walkRoot = ceRoot || root;
 
-  // Walk up and find spans with the target property
-  const walker = document.createTreeWalker(
-    range.commonAncestorContainer,
-    NodeFilter.SHOW_ELEMENT,
-  );
+  const walker = document.createTreeWalker(walkRoot, NodeFilter.SHOW_ELEMENT);
 
+  const styleProp = STYLE_PROP_MAP[property] || property;
   const spansToUnwrap: HTMLSpanElement[] = [];
   let node: Node | null = walker.nextNode();
   while (node) {
     if (node.nodeName === 'SPAN' && range.intersectsNode(node)) {
       const el = node as HTMLSpanElement;
-      if (el.style.getPropertyValue(property)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const val = (el.style as any)[styleProp];
+      if (val) {
         spansToUnwrap.push(el);
       }
     }
