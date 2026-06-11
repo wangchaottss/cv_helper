@@ -197,7 +197,28 @@ export function useCopyPaste() {
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
       const t = e.target as HTMLElement;
-      if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable || t.closest('[contenteditable="true"]')) return;
+
+      // ContentEditable → insert plain text (avoid bringing external
+      // formatting like Helvetica 12px into the document)
+      if (t.isContentEditable || t.closest('[contenteditable="true"]')) {
+        e.preventDefault();
+        const txt = e.clipboardData?.getData('text/plain');
+        if (txt) {
+          insertTextAtCursor(txt);
+          const wrapper = (t.isContentEditable ? t : t.closest('[contenteditable="true"]'))?.closest('[data-testid^="element-"]') as HTMLElement | null;
+          const ceEl = wrapper?.querySelector('[contenteditable="true"]') as HTMLElement | null;
+          if (wrapper && ceEl) {
+            const id = (wrapper.dataset.testid || '').replace('element-', '');
+            useEditorStore.getState().updateElement(id, { contentHTML: ceEl.innerHTML });
+          }
+        }
+        return;
+      }
+
+      // INPUT/TEXTAREA → let browser handle
+      if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') return;
+
+      // Non-editable → paste as new element
       e.preventDefault();
       const txt = e.clipboardData?.getData('text/plain');
       if (txt) {

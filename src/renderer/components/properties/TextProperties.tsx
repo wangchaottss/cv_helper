@@ -1,7 +1,25 @@
 import React, { useCallback, useMemo } from 'react';
 import type { TextElement } from '../../types/elements';
-import { detectMixedFonts } from '../../utils/richText';
+import { detectMixedFonts, applyFormat } from '../../utils/richText';
+import { useEditorStore } from '../../store/editorStore';
 import FontSelector from './FontSelector';
+
+function hasTextSelection(elementId: string): boolean {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed) return false;
+  // Check selection is inside this element's contentEditable
+  const wrapper = document.querySelector(`[data-testid="element-${elementId}"]`);
+  const ceEl = wrapper?.querySelector('[contenteditable="true"]');
+  return !!(ceEl && sel.anchorNode && ceEl.contains(sel.anchorNode));
+}
+
+function syncContentAfterFormat(elementId: string): void {
+  const wrapper = document.querySelector(`[data-testid="element-${elementId}"]`);
+  const ceEl = wrapper?.querySelector('[contenteditable="true"]') as HTMLElement | null;
+  if (ceEl) {
+    useEditorStore.getState().updateElement(elementId, { contentHTML: ceEl.innerHTML });
+  }
+}
 
 interface TextPropertiesProps {
   element: TextElement;
@@ -20,6 +38,18 @@ export default function TextProperties({ element, onUpdate, disabled }: TextProp
     },
     [onUpdate],
   );
+  // Apply inline format when text is selected in contentEditable
+  const handleInlineFormat = useCallback(
+    (property: string, value: string) => {
+      if (hasTextSelection(element.id)) {
+        applyFormat(property, value);
+        syncContentAfterFormat(element.id);
+      } else {
+        onUpdate({ [property as keyof TextElement]: value as never });
+      }
+    },
+    [element.id, onUpdate],
+  );
 
   return (
     <div className="space-y-4" data-testid="text-properties">
@@ -32,7 +62,7 @@ export default function TextProperties({ element, onUpdate, disabled }: TextProp
         )}
         <FontSelector
           value={hasMixedFonts ? '' : element.defaultFontFamily}
-          onChange={(font) => handleChange('defaultFontFamily', font)}
+          onChange={(font) => handleInlineFormat('font-family', font)}
           disabled={disabled}
           placeholder={hasMixedFonts ? 'Mixed' : undefined}
         />
@@ -45,7 +75,7 @@ export default function TextProperties({ element, onUpdate, disabled }: TextProp
             value={element.defaultFontSize}
             min={8}
             max={72}
-            onChange={(v) => handleChange('defaultFontSize', v)}
+            onChange={(v) => handleInlineFormat('font-size', `${v}px`)}
             disabled={disabled}
           />
           <span className="text-xs text-gray-400">px</span>
@@ -56,7 +86,7 @@ export default function TextProperties({ element, onUpdate, disabled }: TextProp
       <PropertyGroup label="Color">
         <ColorInput
           value={element.defaultColor}
-          onChange={(v) => handleChange('defaultColor', v)}
+          onChange={(v) => handleInlineFormat('color', v)}
           disabled={disabled}
         />
       </PropertyGroup>
@@ -67,7 +97,7 @@ export default function TextProperties({ element, onUpdate, disabled }: TextProp
           <ToggleButton
             active={element.defaultFontWeight >= 700}
             onClick={() =>
-              handleChange('defaultFontWeight', element.defaultFontWeight >= 700 ? 400 : 700)
+              handleInlineFormat('font-weight', element.defaultFontWeight >= 700 ? '400' : '700')
             }
             disabled={disabled}
             title="Bold"
@@ -77,10 +107,7 @@ export default function TextProperties({ element, onUpdate, disabled }: TextProp
           <ToggleButton
             active={element.defaultFontStyle === 'italic'}
             onClick={() =>
-              handleChange(
-                'defaultFontStyle',
-                element.defaultFontStyle === 'italic' ? 'normal' : 'italic',
-              )
+              handleInlineFormat('font-style', element.defaultFontStyle === 'italic' ? 'normal' : 'italic')
             }
             disabled={disabled}
             title="Italic"
