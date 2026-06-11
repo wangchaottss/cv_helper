@@ -274,22 +274,17 @@ export function useCopyPaste() {
     const isEditing = t.isContentEditable || !!t.closest('[contenteditable="true"]');
     console.warn('[ctxmenu] isEditing:', isEditing, 'hasSel:', st.selection.length > 0);
 
-    // Save cursor range at exact right-click position
+    // Save cursor range at exact right-click position.
+    // caretRangeFromPoint is Chromium-specific but handles <br> and empty
+    // lines correctly, unlike the newer caretPositionFromPoint or getSelection.
     _savedRange = null;
     if (isEditing) {
-      // Use caretPositionFromPoint to get the exact text position under the cursor
-      // This is more reliable than window.getSelection() which may not update
-      // on right-click before the contextmenu event fires
-      const caretPos = (document as any).caretPositionFromPoint?.(e.clientX, e.clientY) as
-        { offsetNode: Node; offset: number } | null;
-      if (caretPos) {
-        const r = document.createRange();
-        r.setStart(caretPos.offsetNode, caretPos.offset);
-        r.collapse(true);
-        _savedRange = r;
-        console.warn('[ctxmenu] saved range via caretPositionFromPoint, offset:', caretPos.offset);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cr = (document as any).caretRangeFromPoint?.(e.clientX, e.clientY) as Range | null;
+      if (cr) {
+        _savedRange = cr.cloneRange();
+        console.warn('[ctxmenu] saved range via caretRangeFromPoint, collapsed:', cr.collapsed);
       } else {
-        // Fallback: use current selection
         const sel = window.getSelection();
         if (sel?.rangeCount) {
           _savedRange = sel.getRangeAt(0).cloneRange();
