@@ -42,8 +42,8 @@ export default function FormatToolbar({ visible, editor }: FormatToolbarProps) {
       className="flex items-center gap-1 p-1.5 bg-white border border-gray-300 rounded-lg shadow-lg"
       style={{ position: 'absolute', top: '-48px', left: '0', zIndex: 10000, whiteSpace: 'nowrap' }}
       data-testid="format-toolbar"
+      onPointerDown={(e) => e.stopPropagation()}
       onMouseDown={(e) => {
-        // Don't prevent default on selects/inputs — they need mousedown to open
         const el = e.target as HTMLElement;
         if (!el.closest('select') && !el.closest('input')) e.preventDefault();
       }}
