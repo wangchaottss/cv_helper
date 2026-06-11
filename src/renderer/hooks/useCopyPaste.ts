@@ -155,16 +155,17 @@ export function useCopyPaste() {
       const active = document.activeElement as HTMLElement | null;
       const inEditable = !!(active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable || active.closest('[contenteditable="true"]')));
 
-      // Cmd+C
+      // Cmd+C: elements take priority over text
       if (e.code === 'KeyC' && !e.shiftKey) {
-        if (inEditable) {
-          // Explicitly trigger copy — browser native Cmd+C may not
-          // propagate to the copy event in all Electron contexts
-          e.preventDefault();
-          document.execCommand('copy');
-        } else {
+        const store = useEditorStore.getState();
+        if (store.selection.length > 0) {
+          // Elements selected → copy elements to internal clipboard
           e.preventDefault();
           handleCopy();
+        } else if (inEditable) {
+          // Editing text → trigger browser copy
+          e.preventDefault();
+          document.execCommand('copy');
         }
         return;
       }
