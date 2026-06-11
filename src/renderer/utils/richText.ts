@@ -12,12 +12,41 @@ export function applyFormat(property: string, value: string): void {
   const range = selection.getRangeAt(0);
   if (range.collapsed) return;
 
+  // Save selection boundaries before DOM mutation
+  const startContainer = range.startContainer;
+  const startOffset = range.startOffset;
+  const endContainer = range.endContainer;
+  const endOffset = range.endOffset;
+
   // Unwrap existing spans with the same property before re-wrapping
   unwrapPropertyInRange(range, property);
 
   const span = document.createElement('span');
   span.style.setProperty(property, value);
   wrapRangeWithElement(range, span);
+
+  // Restore selection inside the new span
+  try {
+    const newRange = document.createRange();
+    // The content is now inside the <span>
+    if (span.firstChild) {
+      newRange.setStart(span.firstChild, 0);
+      newRange.setEnd(span.lastChild!, (span.lastChild as Text).length || (span.lastChild?.textContent?.length || 0));
+    } else {
+      newRange.selectNodeContents(span);
+    }
+    selection.removeAllRanges();
+    selection.addRange(newRange);
+  } catch {
+    // If restoration fails, at least collapse to the end of the span
+    try {
+      const fallback = document.createRange();
+      fallback.selectNodeContents(span);
+      fallback.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(fallback);
+    } catch { /* give up */ }
+  }
 }
 
 /**
