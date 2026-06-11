@@ -156,7 +156,7 @@ export function useCopyPaste() {
       if (e.code === 'KeyC' && !e.shiftKey) {
         const t = e.target as HTMLElement;
         if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') return;
-        if (t.isContentEditable && window.getSelection() && !window.getSelection()!.isCollapsed) return;
+        if ((t.isContentEditable || t.closest('[contenteditable="true"]')) && window.getSelection() && !window.getSelection()!.isCollapsed) return;
         e.preventDefault();
         handleCopy();
         return;
