@@ -157,7 +157,13 @@ export function useCopyPaste() {
 
       // Cmd+C
       if (e.code === 'KeyC' && !e.shiftKey) {
-        if (inEditable) return; // browser handles copy natively
+        const sel = window.getSelection();
+        console.warn('[keydown] Cmd+C | inEditable:', inEditable,
+          'active:', active?.tagName,
+          'contentEditable:', active?.isContentEditable,
+          'closest:', !!active?.closest('[contenteditable="true"]'),
+          'sel:', sel?.isCollapsed === false ? 'hasSelection' : 'collapsed');
+        if (inEditable) return;
         e.preventDefault();
         handleCopy();
         return;
