@@ -12,6 +12,8 @@ let _lastMouseClientY = 0;
 let _globalCopy: (() => void) | null = null;
 let _globalPaste: ((clientX: number, clientY: number) => Promise<void>) | null = null;
 let _rightClickSavedRange: Range | null = null;
+let _ctxMenuClientX = 0;
+let _ctxMenuClientY = 0;
 
 export function triggerGlobalCopy() { _globalCopy?.(); }
 export async function triggerGlobalPaste() {
@@ -76,16 +78,18 @@ export function useCopyPaste() {
     return () => window.removeEventListener('mousemove', h);
   }, []);
 
-  // On right-click, the browser moves the cursor to the click position during
-  // mousedown. Capture the selection in mouseup (after the move) so we have
-  // the correct range for context menu paste.
-  // Module-level so it survives React re-renders between mouseup and contextmenu.
+  // On right-click, capture the selection after the browser moves the cursor.
+  // macOS: two-finger tap → button=2; Ctrl+click → button=0, ctrlKey=true.
   useEffect(() => {
     const onUp = (e: MouseEvent) => {
-      if (e.button !== 2) return;
+      const isRightClick = e.button === 2 || (e.button === 0 && e.ctrlKey);
+      if (!isRightClick) return;
+      console.warn('[mouseup] right-click detected, button:', e.button, 'ctrlKey:', e.ctrlKey);
       const sel = window.getSelection();
       if (sel?.rangeCount) {
         _rightClickSavedRange = sel.getRangeAt(0).cloneRange();
+        console.warn('[mouseup] captured range, node:', _rightClickSavedRange.startContainer.nodeName,
+          'offset:', _rightClickSavedRange.startOffset);
       }
     };
     window.addEventListener('mouseup', onUp);
@@ -291,20 +295,14 @@ export function useCopyPaste() {
     const isEditing = t.isContentEditable || !!t.closest('[contenteditable="true"]');
     console.warn('[ctxmenu] isEditing:', isEditing, 'hasSel:', st.selection.length > 0);
 
-    // Prefer mouseup-captured range. On macOS trackpad two-finger tap,
-    // mouseup doesn't fire — the browser still moves the cursor, so
-    // fall back to current selection.
+    // Save click coordinates (for paste resolution if mouseup didn't fire)
     if (isEditing) {
+      _ctxMenuClientX = e.clientX;
+      _ctxMenuClientY = e.clientY;
       if (_rightClickSavedRange) {
-        console.warn('[ctxmenu] using mouseup range, collapsed:', _rightClickSavedRange.collapsed);
+        console.warn('[ctxmenu] using mouseup range');
       } else {
-        const sel = window.getSelection();
-        if (sel?.rangeCount) {
-          _rightClickSavedRange = sel.getRangeAt(0).cloneRange();
-          console.warn('[ctxmenu] fallback to getSelection, collapsed:', _rightClickSavedRange.collapsed);
-        } else {
-          console.warn('[ctxmenu] no range available');
-        }
+        console.warn('[ctxmenu] no mouseup range — will resolve at paste time');
       }
     }
 
@@ -319,9 +317,43 @@ export function useCopyPaste() {
       action: async () => {
         if (isEditing) {
           const txt = await readSystemClipboardText();
-          const r = _rightClickSavedRange;
+          if (!txt) { console.warn('[ctxmenu] no text'); return; }
+
+          // Resolve range: prefer mouseup capture, fall back to
+          // caretRangeFromPoint at saved click coordinates.
+          let r = _rightClickSavedRange;
           _rightClickSavedRange = null;
-          if (!txt || !r) { console.warn('[ctxmenu] no text or no range'); return; }
+
+          if (!r) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const cr = (document as any).caretRangeFromPoint(_ctxMenuClientX, _ctxMenuClientY) as Range | null;
+            if (cr) {
+              console.warn('[ctxmenu] caretRangeFromPoint: node=', cr.startContainer.nodeName,
+                'offset=', cr.startOffset,
+                'text=', cr.startContainer.textContent?.slice(0, 40));
+              // If caretRangeFromPoint returned offset 0 of a text node but
+              // the click was on a <br> (empty line), manually fix the range.
+              const el = document.elementFromPoint(_ctxMenuClientX, _ctxMenuClientY);
+              if (el?.nodeName === 'BR' && cr.startOffset === 0) {
+                const ceEl = el.parentElement;
+                if (ceEl) {
+                  const brIdx = Array.from(ceEl.childNodes).indexOf(el as ChildNode);
+                  if (brIdx >= 0) {
+                    const newR = document.createRange();
+                    newR.setStart(ceEl, brIdx);
+                    newR.collapse(true);
+                    r = newR;
+                    console.warn('[ctxmenu] fixed range: clicked on <br> at child index', brIdx);
+                  }
+                }
+              }
+              if (!r) r = cr;
+            }
+          }
+
+          if (!r) { console.warn('[ctxmenu] no range resolved'); return; }
+
+          console.warn('[ctxmenu] using range: node=', r.startContainer.nodeName, 'offset=', r.startOffset);
           const sel = window.getSelection();
           if (!sel) return;
           sel.removeAllRanges();
