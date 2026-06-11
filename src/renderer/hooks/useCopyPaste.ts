@@ -74,15 +74,21 @@ export function useCopyPaste() {
     return () => window.removeEventListener('mousemove', h);
   }, []);
 
-  // ---- Unified Copy: elements > selected text ----
+  // ---- Unified Copy: selected text > elements ----
   const handleCopy = useCallback(() => {
+    // 1) Text selected in editor → always prefer text
+    const text = getSelectedText();
+    if (text) {
+      setClipboardText(text);
+      navigator.clipboard?.writeText(text).catch(() => {});
+      return;
+    }
+    // 2) Elements selected, no text → copy elements
     const s = useEditorStore.getState();
-    // Elements selected → copy elements
     if (s.selection.length) {
       const els = s.selection.map((id) => s.elements[id]).filter(Boolean) as CanvasElement[];
       if (els.length) {
         setClipboardElements(els);
-        // Also write text to system clipboard
         const parts: string[] = [];
         for (const el of els) {
           if (el.type === 'text') {
@@ -92,14 +98,7 @@ export function useCopyPaste() {
           }
         }
         if (parts.length) navigator.clipboard?.writeText(parts.join('\n')).catch(() => {});
-        return;
       }
-    }
-    // No elements → check text selection
-    const text = getSelectedText();
-    if (text) {
-      setClipboardText(text);
-      navigator.clipboard?.writeText(text).catch(() => {});
     }
   }, []);
 
