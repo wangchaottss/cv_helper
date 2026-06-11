@@ -1,25 +1,8 @@
 import React, { useCallback, useMemo } from 'react';
 import type { TextElement } from '../../types/elements';
-import { detectMixedFonts, applyFormat, getActiveFormats } from '../../utils/richText';
-import { useEditorStore } from '../../store/editorStore';
+import { detectMixedFonts } from '../../utils/richText';
+import { getActiveEditor } from '../../utils/tiptapExtensions';
 import FontSelector from './FontSelector';
-
-function hasTextSelection(elementId: string): boolean {
-  const sel = window.getSelection();
-  if (!sel || sel.isCollapsed) return false;
-  const node = sel.anchorNode;
-  if (!node) return false;
-  const wrapper = (node.parentElement || (node as Element).closest?.('*'))?.closest?.('[data-testid^="element-"]') as HTMLElement | null;
-  return wrapper ? (wrapper.dataset.testid || '').replace('element-', '') === elementId : false;
-}
-
-function syncContentAfterFormat(elementId: string): void {
-  const wrapper = document.querySelector(`[data-testid="element-${elementId}"]`);
-  const ceEl = wrapper?.querySelector('[contenteditable="true"]') as HTMLElement | null;
-  if (ceEl) {
-    useEditorStore.getState().updateElement(elementId, { contentHTML: ceEl.innerHTML });
-  }
-}
 
 interface TextPropertiesProps {
   element: TextElement;
@@ -32,6 +15,11 @@ export default function TextProperties({ element, onUpdate, disabled }: TextProp
     () => detectMixedFonts(element.contentHTML, element.defaultFontFamily),
     [element.contentHTML, element.defaultFontFamily],
   );
+
+  // Check if this element's editor is currently focused (has text selection)
+  const ed = getActiveEditor();
+  const isInline = ed && ed.isFocused && !ed.state.selection.empty;
+
   const handleChange = useCallback(
     (field: keyof TextElement, value: string | number) => {
       onUpdate({ [field]: value });
@@ -39,283 +27,123 @@ export default function TextProperties({ element, onUpdate, disabled }: TextProp
     [onUpdate],
   );
 
-  // Unified toggle for Bold/Italic — same logic as FormatToolbar.
-  // When text is selected: toggles inline via getActiveFormats + applyFormat.
-  // When no selection: toggles element default via onUpdate.
-  const handleToggle = useCallback(
-    (cssProp: string, onVal: string, offVal: string, field: keyof TextElement, elementIsOn: boolean, elementOnVal: string | number, elementOffVal: string | number) => {
-      if (hasTextSelection(element.id)) {
-        const fmt = getActiveFormats();
-        let isOn = false;
-        if (cssProp === 'font-weight') isOn = fmt.fontWeight === '700' || fmt.fontWeight === 'bold';
-        else if (cssProp === 'font-style') isOn = fmt.fontStyle === 'italic';
-        applyFormat(cssProp, isOn ? offVal : onVal);
-        syncContentAfterFormat(element.id);
-      } else {
-        onUpdate({ [field]: elementIsOn ? elementOffVal : elementOnVal } as Partial<TextElement>);
-      }
-    },
-    [element.id, onUpdate],
-  );
-
-  // For Font/Size/Color: apply inline if selection exists, else element default
-  const handleSet = useCallback(
-    (cssProp: string, cssValue: string, field: keyof TextElement) => {
-      if (hasTextSelection(element.id)) {
-        applyFormat(cssProp, cssValue);
-        syncContentAfterFormat(element.id);
-      } else {
-        const val: string | number = field === 'defaultFontSize' ? parseFloat(cssValue) : cssValue;
-        onUpdate({ [field]: val });
-      }
-    },
-    [element.id, onUpdate],
-  );
-
   return (
     <div className="space-y-4" data-testid="text-properties">
-      {/* Font Family */}
       <PropertyGroup label="Font">
         {hasMixedFonts && (
-          <p className="text-[10px] text-amber-600 mb-1" data-testid="mixed-font-warning">
-            Mixed fonts detected
-          </p>
+          <p className="text-[10px] text-amber-600 mb-1">Mixed fonts detected</p>
         )}
         <FontSelector
           value={hasMixedFonts ? '' : element.defaultFontFamily}
-          onChange={(font) => handleSet('font-family', font, 'defaultFontFamily')}
+          onChange={(font) => {
+            if (isInline) ed?.chain().focus().setFontFamily(font).run();
+            else handleChange('defaultFontFamily', font);
+          }}
           disabled={disabled}
           placeholder={hasMixedFonts ? 'Mixed' : undefined}
         />
       </PropertyGroup>
 
-      {/* Font Size */}
       <PropertyGroup label="Size">
         <div className="flex items-center gap-1">
           <NumberInput
             value={element.defaultFontSize}
-            min={8}
-            max={72}
-            onChange={(v) => handleSet('font-size', `${v}px`, 'defaultFontSize')}
+            min={8} max={72}
+            onChange={(v) => {
+              if (isInline) ed?.chain().focus().setMark('textStyle', { fontSize: `${v}px` }).run();
+              else handleChange('defaultFontSize', v);
+            }}
             disabled={disabled}
           />
           <span className="text-xs text-gray-400">px</span>
         </div>
       </PropertyGroup>
 
-      {/* Font Color */}
       <PropertyGroup label="Color">
         <ColorInput
           value={element.defaultColor}
-          onChange={(v) => handleSet('color', v, 'defaultColor')}
+          onChange={(v) => {
+            if (isInline) ed?.chain().focus().setColor(v).run();
+            else handleChange('defaultColor', v);
+          }}
           disabled={disabled}
         />
       </PropertyGroup>
 
-      {/* Bold / Italic */}
       <PropertyGroup label="Style">
         <div className="flex gap-1">
           <ToggleButton
             active={element.defaultFontWeight >= 700}
-            onClick={() =>
-              handleToggle('font-weight', '700', '400', 'defaultFontWeight', element.defaultFontWeight >= 700, 700, 400)
-            }
-            disabled={disabled}
-            title="Bold"
-          >
-            <strong>B</strong>
-          </ToggleButton>
+            onClick={() => {
+              if (isInline) ed?.chain().focus().toggleBold().run();
+              else handleChange('defaultFontWeight', element.defaultFontWeight >= 700 ? 400 : 700);
+            }}
+            disabled={disabled} title="Bold"
+          ><strong>B</strong></ToggleButton>
           <ToggleButton
             active={element.defaultFontStyle === 'italic'}
-            onClick={() =>
-              handleToggle('font-style', 'italic', 'normal', 'defaultFontStyle', element.defaultFontStyle === 'italic', 'italic', 'normal')
-            }
-            disabled={disabled}
-            title="Italic"
-          >
-            <em>I</em>
-          </ToggleButton>
+            onClick={() => {
+              if (isInline) ed?.chain().focus().toggleItalic().run();
+              else handleChange('defaultFontStyle', element.defaultFontStyle === 'italic' ? 'normal' : 'italic');
+            }}
+            disabled={disabled} title="Italic"
+          ><em>I</em></ToggleButton>
         </div>
       </PropertyGroup>
 
-      {/* Text Alignment */}
       <PropertyGroup label="Align">
         <div className="flex gap-1">
           {(['left', 'center', 'right'] as const).map((align) => (
             <ToggleButton
-              key={align}
-              active={element.defaultTextAlign === align}
+              key={align} active={element.defaultTextAlign === align}
               onClick={() => handleChange('defaultTextAlign', align)}
-              disabled={disabled}
-              title={`Align ${align}`}
-            >
-              {align === 'left' ? '⫷' : align === 'center' ? '⫿' : '⫸'}
-            </ToggleButton>
+              disabled={disabled} title={`Align ${align}`}
+            >{align === 'left' ? '⫷' : align === 'center' ? '⫿' : '⫸'}</ToggleButton>
           ))}
         </div>
       </PropertyGroup>
 
-      {/* Line Height */}
       <PropertyGroup label="Line Height">
-        <NumberInput
-          value={element.defaultLineHeight}
-          min={1}
-          max={3}
-          step={0.1}
-          onChange={(v) => handleChange('defaultLineHeight', v)}
-          disabled={disabled}
-        />
+        <NumberInput value={element.defaultLineHeight} min={1} max={3} step={0.1}
+          onChange={(v) => handleChange('defaultLineHeight', v)} disabled={disabled} />
       </PropertyGroup>
 
-      {/* Background Color */}
       <PropertyGroup label="Background">
         <ColorInput
           value={element.defaultBackgroundColor === 'transparent' ? '#ffffff' : element.defaultBackgroundColor}
-          onChange={(v) => handleChange('defaultBackgroundColor', v)}
-          disabled={disabled}
-          showTransparent
+          onChange={(v) => handleChange('defaultBackgroundColor', v)} disabled={disabled} showTransparent
         />
       </PropertyGroup>
 
-      {/* ID display */}
       <div className="pt-2 border-t border-gray-100">
-        <p className="text-[10px] text-gray-400 truncate" title={element.id}>
-          ID: {element.id}
-        </p>
+        <p className="text-[10px] text-gray-400 truncate" title={element.id}>ID: {element.id}</p>
       </div>
     </div>
   );
 }
 
-// === Sub-components ===
-
+// Sub-components (unchanged)
 function PropertyGroup({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-[11px] font-medium text-gray-500 mb-1 uppercase tracking-wide">
-        {label}
-      </label>
-      {children}
-    </div>
-  );
+  return <div><label className="block text-[11px] font-medium text-gray-500 mb-1 uppercase tracking-wide">{label}</label>{children}</div>;
 }
 
-function NumberInput({
-  value,
-  min,
-  max,
-  step = 1,
-  onChange,
-  disabled,
-}: {
-  value: number;
-  min: number;
-  max: number;
-  step?: number;
-  onChange: (v: number) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <input
-      type="number"
-      value={value}
-      min={min}
-      max={max}
-      step={step}
-      disabled={disabled}
-      onChange={(e) => {
-        const v = parseFloat(e.target.value);
-        if (!isNaN(v)) onChange(v);
-      }}
-      className={`w-16 px-2 py-1 text-sm border rounded text-right ${
-        disabled
-          ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200'
-          : 'bg-white text-gray-700 border-gray-300 focus:outline-none focus:border-blue-400'
-      }`}
-    />
-  );
+function NumberInput({ value, min, max, step = 1, onChange, disabled }: { value: number; min: number; max: number; step?: number; onChange: (v: number) => void; disabled?: boolean }) {
+  return <input type="number" value={value} min={min} max={max} step={step} disabled={disabled}
+    onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(v); }}
+    className={`w-16 px-2 py-1 text-sm border rounded text-right ${disabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' : 'bg-white text-gray-700 border-gray-300 focus:outline-none focus:border-blue-400'}`} />;
 }
 
-function ColorInput({
-  value,
-  onChange,
-  disabled,
-  showTransparent,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  disabled?: boolean;
-  showTransparent?: boolean;
-}) {
-  return (
-    <div className="flex items-center gap-1">
-      <input
-        type="color"
-        value={value.startsWith('#') ? value : '#ffffff'}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
-        className={`w-8 h-8 rounded border cursor-pointer ${
-          disabled ? 'opacity-50 cursor-not-allowed' : 'border-gray-300'
-        }`}
-      />
-      <input
-        type="text"
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
-        className={`flex-1 px-2 py-1 text-sm border rounded ${
-          disabled
-            ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200'
-            : 'bg-white text-gray-700 border-gray-300 focus:outline-none focus:border-blue-400'
-        }`}
-      />
-      {showTransparent && (
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => onChange('transparent')}
-          className={`text-[10px] px-1.5 py-1 rounded border ${
-            disabled
-              ? 'bg-gray-100 text-gray-400 border-gray-200'
-              : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50'
-          }`}
-          title="Transparent"
-        >
-          ✕
-        </button>
-      )}
-    </div>
-  );
+function ColorInput({ value, onChange, disabled, showTransparent }: { value: string; onChange: (v: string) => void; disabled?: boolean; showTransparent?: boolean }) {
+  return <div className="flex items-center gap-1">
+    <input type="color" value={value.startsWith('#') ? value : '#ffffff'} disabled={disabled} onChange={(e) => onChange(e.target.value)}
+      className={`w-8 h-8 rounded border cursor-pointer ${disabled ? 'opacity-50 cursor-not-allowed' : 'border-gray-300'}`} />
+    <input type="text" value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)}
+      className={`flex-1 px-2 py-1 text-sm border rounded ${disabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' : 'bg-white text-gray-700 border-gray-300 focus:outline-none focus:border-blue-400'}`} />
+    {showTransparent && <button type="button" disabled={disabled} onClick={() => onChange('transparent')} className="text-[10px] px-1.5 py-1 rounded border bg-white text-gray-500 border-gray-300 hover:bg-gray-50" title="Transparent">✕</button>}
+  </div>;
 }
 
-function ToggleButton({
-  active,
-  onClick,
-  disabled,
-  title,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  disabled?: boolean;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      title={title}
-      className={`w-8 h-7 text-sm flex items-center justify-center rounded border ${
-        disabled
-          ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200'
-          : active
-            ? 'bg-blue-50 text-blue-700 border-blue-300'
-            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-      }`}
-    >
-      {children}
-    </button>
-  );
+function ToggleButton({ active, onClick, disabled, title, children }: { active: boolean; onClick: () => void; disabled?: boolean; title: string; children: React.ReactNode }) {
+  return <button type="button" disabled={disabled} onClick={onClick} title={title}
+    className={`w-8 h-7 text-sm flex items-center justify-center rounded border ${disabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' : active ? 'bg-blue-50 text-blue-700 border-blue-300' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}>{children}</button>;
 }

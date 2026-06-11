@@ -20,41 +20,15 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* List styles inside contentEditable text elements */
-[contenteditable] ul,
-[contenteditable] ol {
-  margin: 0;
-  padding-left: 1.5em;
+/* Tiptap editor styles */
+.tiptap {
+  outline: none;
+  min-height: 100%;
 }
-
-[contenteditable] ul {
-  list-style-type: disc;
-}
-
-[contenteditable] ul ul {
-  list-style-type: circle;
-}
-
-[contenteditable] ul ul ul {
-  list-style-type: square;
-}
-
-[contenteditable] ol {
-  list-style-type: decimal;
-}
-
-[contenteditable] ol ol {
-  list-style-type: lower-alpha;
-}
-
-[contenteditable] ol ol ol {
-  list-style-type: lower-roman;
-}
-
-[contenteditable] li {
-  margin: 0;
-  padding: 0;
-}
+.tiptap ul { padding-left: 1.5em; }
+.tiptap ol { padding-left: 1.5em; }
+.tiptap p { margin: 0; }
+.tiptap h1, .tiptap h2, .tiptap h3 { margin: 0.5em 0; }
 
 /* Prevent text selection during drag */
 .dragging * {
