@@ -99,6 +99,14 @@ function TextElementView({ element, isSelected, isEditing, onPointerDown, onResi
     immediatelyRender: false,
   });
 
+  // Auto-focus when entering edit mode
+  useEffect(() => {
+    if (isEditing && editor) {
+      const timer = setTimeout(() => editor.commands.focus('end'), 0);
+      return () => clearTimeout(timer);
+    }
+  }, [isEditing, editor]);
+
   const baseStyle: React.CSSProperties = {
     position: 'absolute',
     left: `${element.x}px`, top: `${element.y}px`,
@@ -123,12 +131,13 @@ function TextElementView({ element, isSelected, isEditing, onPointerDown, onResi
     <div
       style={baseStyle}
       data-testid={`element-${element.id}`}
+      onPointerDown={onPointerDown}
+      onDoubleClick={onDoubleClick}
     >
       <FormatToolbar visible={isEditing} editor={editor} />
       <div
         style={{ width: '100%', height: '100%', cursor: isEditing ? 'text' : 'move' }}
-        onPointerDown={onPointerDown}
-        onDoubleClick={onDoubleClick}
+        onPointerDown={(e) => { if (isEditing) e.stopPropagation(); }}
       >
         <EditorContent editor={editor} />
       </div>
