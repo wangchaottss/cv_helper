@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -142,7 +143,20 @@ function TextElementView({ element, isSelected, isEditing, onPointerDown, onResi
       onPointerDown={onPointerDown}
       onDoubleClick={onDoubleClick}
     >
-      <FormatToolbar visible={isEditing} editor={editor} />
+      {/* Portal toolbar to A4 canvas so it's above all elements
+          regardless of this element's z-index / stacking context */}
+      {isEditing && createPortal(
+        <div style={{
+          position: 'absolute',
+          left: `${element.x}px`,
+          top: `${element.y}px`,
+          zIndex: 100000,
+          pointerEvents: 'auto',
+        }}>
+          <FormatToolbar visible={true} editor={editor} />
+        </div>,
+        document.querySelector('[data-canvas-inner="true"]') || document.body,
+      )}
       <div style={{ width: '100%', height: '100%', position: 'relative' }}>
         {/* Tiptap editor — always rendered, always editable */}
         <EditorContent editor={editor} />
