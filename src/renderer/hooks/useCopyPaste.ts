@@ -157,15 +157,15 @@ export function useCopyPaste() {
 
       // Cmd+C
       if (e.code === 'KeyC' && !e.shiftKey) {
-        const sel = window.getSelection();
-        console.warn('[keydown] Cmd+C | inEditable:', inEditable,
-          'active:', active?.tagName,
-          'contentEditable:', active?.isContentEditable,
-          'closest:', !!active?.closest('[contenteditable="true"]'),
-          'sel:', sel?.isCollapsed === false ? 'hasSelection' : 'collapsed');
-        if (inEditable) return;
-        e.preventDefault();
-        handleCopy();
+        if (inEditable) {
+          // Explicitly trigger copy — browser native Cmd+C may not
+          // propagate to the copy event in all Electron contexts
+          e.preventDefault();
+          document.execCommand('copy');
+        } else {
+          e.preventDefault();
+          handleCopy();
+        }
         return;
       }
 
