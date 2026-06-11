@@ -1,5 +1,8 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import type { Editor } from '@tiptap/react';
+import FontSelector from '../properties/FontSelector';
+
+const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 36, 48, 72];
 
 interface FormatToolbarProps {
   visible: boolean;
@@ -7,12 +10,24 @@ interface FormatToolbarProps {
 }
 
 export default function FormatToolbar({ visible, editor }: FormatToolbarProps) {
-  const handleBold = useCallback(() => editor?.chain().focus().toggleBold().run(), [editor]);
-  const handleItalic = useCallback(() => editor?.chain().focus().toggleItalic().run(), [editor]);
-  const handleUnderline = useCallback(() => editor?.chain().focus().toggleUnderline().run(), [editor]);
-  const handleBulletList = useCallback(() => editor?.chain().focus().toggleBulletList().run(), [editor]);
-  const handleOrderedList = useCallback(() => editor?.chain().focus().toggleOrderedList().run(), [editor]);
-  const handleClear = useCallback(() => editor?.chain().focus().clearNodes().unsetAllMarks().run(), [editor]);
+  const [fontSize, setFontSize] = useState('16');
+  const [color, setColor] = useState('#000000');
+
+  // Sync displayed size/color from current selection
+  useEffect(() => {
+    if (!editor) return;
+    const update = () => {
+      const attrs = editor.getAttributes('textStyle');
+      if (attrs.fontSize) setFontSize(parseInt(attrs.fontSize)?.toString() || '16');
+      if (attrs.color) setColor(attrs.color);
+    };
+    editor.on('selectionUpdate', update);
+    editor.on('transaction', update);
+    return () => {
+      editor.off('selectionUpdate', update);
+      editor.off('transaction', update);
+    };
+  }, [editor]);
 
   if (!visible || !editor) return null;
 
@@ -29,14 +44,56 @@ export default function FormatToolbar({ visible, editor }: FormatToolbarProps) {
       data-testid="format-toolbar"
       onMouseDown={(e) => e.preventDefault()}
     >
-      <TBtn active={isBold} onClick={handleBold} title="Bold"><strong>B</strong></TBtn>
-      <TBtn active={isItalic} onClick={handleItalic} title="Italic"><em>I</em></TBtn>
-      <TBtn active={isUnderline} onClick={handleUnderline} title="Underline"><u>U</u></TBtn>
-      <div className="w-px h-5 bg-gray-200 mx-1" />
-      <TBtn active={isBullet} onClick={handleBulletList} title="Bullet list"><span className="text-sm">•</span></TBtn>
-      <TBtn active={isOrdered} onClick={handleOrderedList} title="Numbered list"><span className="text-xs font-medium">1.</span></TBtn>
-      <div className="w-px h-5 bg-gray-200 mx-1" />
-      <TBtn active={false} onClick={handleClear} title="Clear formatting"><span className="text-xs">Tx</span></TBtn>
+      {/* Font family */}
+      <div style={{ width: 130 }}>
+        <FontSelector
+          value={editor.getAttributes('textStyle').fontFamily || ''}
+          onChange={(font) => editor.chain().focus().setFontFamily(font).run()}
+        />
+      </div>
+      <div className="w-px h-5 bg-gray-200" />
+
+      {/* Font size */}
+      <select
+        value={fontSize}
+        onChange={(e) => {
+          setFontSize(e.target.value);
+          editor.chain().focus().setMark('textStyle', { fontSize: `${e.target.value}px` }).run();
+        }}
+        className="h-7 text-xs border border-gray-300 rounded px-1 bg-white"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        {FONT_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
+      </select>
+      <div className="w-px h-5 bg-gray-200" />
+
+      {/* Text color */}
+      <input
+        type="color"
+        value={color}
+        onChange={(e) => {
+          setColor(e.target.value);
+          editor.chain().focus().setColor(e.target.value).run();
+        }}
+        className="w-6 h-6 rounded border border-gray-300 cursor-pointer p-0"
+        title="Text color"
+        onMouseDown={(e) => e.stopPropagation()}
+      />
+      <div className="w-px h-5 bg-gray-200 mx-0.5" />
+
+      {/* Bold / Italic / Underline */}
+      <TBtn active={isBold} onClick={() => editor.chain().focus().toggleBold().run()} title="Bold"><strong>B</strong></TBtn>
+      <TBtn active={isItalic} onClick={() => editor.chain().focus().toggleItalic().run()} title="Italic"><em>I</em></TBtn>
+      <TBtn active={isUnderline} onClick={() => editor.chain().focus().toggleUnderline().run()} title="Underline"><u>U</u></TBtn>
+      <div className="w-px h-5 bg-gray-200" />
+
+      {/* Lists */}
+      <TBtn active={isBullet} onClick={() => editor.chain().focus().toggleBulletList().run()} title="Bullet list"><span className="text-sm">•</span></TBtn>
+      <TBtn active={isOrdered} onClick={() => editor.chain().focus().toggleOrderedList().run()} title="Numbered list"><span className="text-xs font-medium">1.</span></TBtn>
+      <div className="w-px h-5 bg-gray-200" />
+
+      {/* Clear formatting */}
+      <TBtn active={false} onClick={() => editor.chain().focus().clearNodes().unsetAllMarks().run()} title="Clear formatting"><span className="text-xs">Tx</span></TBtn>
     </div>
   );
 }

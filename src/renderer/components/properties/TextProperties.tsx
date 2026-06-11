@@ -1,8 +1,5 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback } from 'react';
 import type { TextElement } from '../../types/elements';
-import { detectMixedFonts } from '../../utils/richText';
-import { getActiveEditor } from '../../utils/tiptapExtensions';
-import FontSelector from './FontSelector';
 
 interface TextPropertiesProps {
   element: TextElement;
@@ -11,15 +8,6 @@ interface TextPropertiesProps {
 }
 
 export default function TextProperties({ element, onUpdate, disabled }: TextPropertiesProps) {
-  const hasMixedFonts = useMemo(
-    () => detectMixedFonts(element.contentHTML, element.defaultFontFamily),
-    [element.contentHTML, element.defaultFontFamily],
-  );
-
-  // Check if this element's editor is currently focused (has text selection)
-  const ed = getActiveEditor();
-  const isInline = ed && ed.isFocused && !ed.state.selection.empty;
-
   const handleChange = useCallback(
     (field: keyof TextElement, value: string | number) => {
       onUpdate({ [field]: value });
@@ -29,47 +17,7 @@ export default function TextProperties({ element, onUpdate, disabled }: TextProp
 
   return (
     <div className="space-y-4" data-testid="text-properties">
-      <PropertyGroup label="Font">
-        {hasMixedFonts && (
-          <p className="text-[10px] text-amber-600 mb-1">Mixed fonts detected</p>
-        )}
-        <FontSelector
-          value={hasMixedFonts ? '' : element.defaultFontFamily}
-          onChange={(font) => {
-            if (isInline) ed?.chain().focus().setFontFamily(font).run();
-            else handleChange('defaultFontFamily', font);
-          }}
-          disabled={disabled}
-          placeholder={hasMixedFonts ? 'Mixed' : undefined}
-        />
-      </PropertyGroup>
-
-      <PropertyGroup label="Size">
-        <div className="flex items-center gap-1">
-          <NumberInput
-            value={element.defaultFontSize}
-            min={8} max={72}
-            onChange={(v) => {
-              if (isInline) ed?.chain().focus().setMark('textStyle', { fontSize: `${v}px` }).run();
-              else handleChange('defaultFontSize', v);
-            }}
-            disabled={disabled}
-          />
-          <span className="text-xs text-gray-400">px</span>
-        </div>
-      </PropertyGroup>
-
-      <PropertyGroup label="Color">
-        <ColorInput
-          value={element.defaultColor}
-          onChange={(v) => {
-            if (isInline) ed?.chain().focus().setColor(v).run();
-            else handleChange('defaultColor', v);
-          }}
-          disabled={disabled}
-        />
-      </PropertyGroup>
-
+      {/* Text Alignment */}
       <PropertyGroup label="Align">
         <div className="flex gap-1">
           {(['left', 'center', 'right'] as const).map((align) => (
@@ -82,11 +30,13 @@ export default function TextProperties({ element, onUpdate, disabled }: TextProp
         </div>
       </PropertyGroup>
 
+      {/* Line Height */}
       <PropertyGroup label="Line Height">
         <NumberInput value={element.defaultLineHeight} min={1} max={3} step={0.1}
           onChange={(v) => handleChange('defaultLineHeight', v)} disabled={disabled} />
       </PropertyGroup>
 
+      {/* Background Color */}
       <PropertyGroup label="Background">
         <ColorInput
           value={element.defaultBackgroundColor === 'transparent' ? '#ffffff' : element.defaultBackgroundColor}
@@ -101,7 +51,6 @@ export default function TextProperties({ element, onUpdate, disabled }: TextProp
   );
 }
 
-// Sub-components (unchanged)
 function PropertyGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return <div><label className="block text-[11px] font-medium text-gray-500 mb-1 uppercase tracking-wide">{label}</label>{children}</div>;
 }
