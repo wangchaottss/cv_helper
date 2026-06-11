@@ -38,14 +38,29 @@ export default function TextProperties({ element, onUpdate, disabled }: TextProp
     },
     [onUpdate],
   );
-  // Apply inline format when text is selected in contentEditable
+  // Map CSS property names to TextElement field names for element-level updates
+  const CSS_TO_ELEMENT: Record<string, keyof TextElement> = {
+    'font-family': 'defaultFontFamily',
+    'font-size': 'defaultFontSize',
+    'color': 'defaultColor',
+    'font-weight': 'defaultFontWeight',
+    'font-style': 'defaultFontStyle',
+  };
+  // Apply inline format when text is selected, otherwise update element default
   const handleInlineFormat = useCallback(
-    (property: string, value: string) => {
+    (cssProp: string, cssValue: string) => {
       if (hasTextSelection(element.id)) {
-        applyFormat(property, value);
+        applyFormat(cssProp, cssValue);
         syncContentAfterFormat(element.id);
       } else {
-        onUpdate({ [property as keyof TextElement]: value as never });
+        const field = CSS_TO_ELEMENT[cssProp] as keyof TextElement;
+        if (field) {
+          const value: string | number =
+            field === 'defaultFontSize' || field === 'defaultFontWeight'
+              ? parseFloat(cssValue)
+              : cssValue;
+          onUpdate({ [field]: value });
+        }
       }
     },
     [element.id, onUpdate],
