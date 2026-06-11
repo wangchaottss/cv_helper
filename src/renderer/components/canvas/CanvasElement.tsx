@@ -217,6 +217,10 @@ export default function CanvasElement({ element, isSelected, onPointerDown, onRe
     width: `${element.width}px`, height: `${element.height}px`,
     zIndex: element.zIndex, boxSizing: 'border-box',
     cursor: 'move', touchAction: 'none',
+    border: element.src ? 'none' : '2px dashed #d1d5db',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: element.src ? 'transparent' : '#f9fafb',
+    overflow: 'hidden',
   };
   if (isSelected) { baseStyle.outline = '2px solid #2563eb'; baseStyle.outlineOffset = '0px'; }
 
